@@ -29,6 +29,8 @@ object CastStatus {
         val phase: Phase = Phase.IDLE,
         /** The receiver's own name, e.g. "Living Room TV". */
         val deviceName: String? = null,
+        /** Which [CastDevice] this is about, to mark it in the device list. */
+        val deviceId: String? = null,
     ) {
         val isCasting: Boolean get() = phase == Phase.CASTING
         val isActive: Boolean get() = phase != Phase.IDLE

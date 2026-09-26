@@ -65,20 +65,6 @@ val castReceiverAppId: String = (
     ).trim()
 
 /*
- * A build without Google Play services' proprietary client libraries — for
- * F-Droid-style distribution and anyone who wants the app strictly free
- * software. The only thing it drops is Google Cast: the `foss` source set
- * swaps in stubs that report Cast as unavailable, and nothing else changes.
- * Off by default. Set FOSS=true in local.properties, BITCHORD_FOSS=true in the
- * environment, or pass -Pfoss=true.
- */
-val fossBuild: Boolean = (
-    (project.findProperty("foss") as String?)
-        ?: localProps.getProperty("FOSS")
-        ?: System.getenv("BITCHORD_FOSS")
-    ).equals("true", ignoreCase = true)
-
-/*
  * Bump this by hand before cutting each sideloaded test build ("beta2",
  * "beta3", ...) and blank it out before cutting the real release. Marks the
  * versionName below as a pre-release: AppUpdateChecker.isNewer() treats any
@@ -132,13 +118,6 @@ android {
             reset()
             include("armeabi-v7a", "arm64-v8a", "x86_64")
             isUniversalApk = true
-        }
-    }
-
-    // Google Cast lives in `gms`; `foss` has the same API as stubs. See fossBuild.
-    sourceSets {
-        getByName("main") {
-            java.srcDir(if (fossBuild) "src/foss/java" else "src/gms/java")
         }
     }
 
@@ -336,12 +315,6 @@ dependencies {
     // progressive, and the extractors try to sniff XML as audio
     // (ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED). See withResolvedStreamType.
     implementation("androidx.media3:media3-exoplayer-dash:1.11.0")
-    // Google Cast. Media3's receiver-side player and session plumbing, plus
-    // MediaRouter for the output sheet's own device list (media3-cast keeps
-    // its MediaRouter dependency internal). Cast needs Google Play services at
-    // runtime and is simply absent where they are — see CastSupport.
-    if (!fossBuild) implementation("androidx.media3:media3-cast:1.11.0")
-    implementation("androidx.mediarouter:mediarouter:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.9.0")
 
     // ---- Images: Coil 3 + Palette (dominant colors for the mesh gradient) ----

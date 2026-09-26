@@ -4,9 +4,8 @@
 it. It plays the audio the phone serves, shows the artwork and track, and
 scrolls synced lyrics (word-by-word where the lyrics have word timing).
 
-Without it, BitChord still casts, using Media3's stock receiver. That receiver
-shows the artwork and titles under an "ExoPlayer Default Receiver" heading and
-has no lyrics.
+Without it, BitChord still casts, using Google's Default Media Receiver, which
+needs no registration. It shows the artwork, title and artist, but no lyrics.
 
 ## Setting it up
 
@@ -32,13 +31,14 @@ has no lyrics.
 
    or, for GitHub Actions builds, add a repository secret named
    `CAST_RECEIVER_APP_ID` with that value. Nothing else changes: the app
-   launches this receiver instead of the stock one, and sends it lyrics.
+   launches this receiver instead of the default one, and sends it lyrics.
 
 ## How it talks to the app
 
-- **Audio.** The audio is a plain HTTP URL on the phone's local network, the
-  same as with the stock receiver. The media's `contentId` is the track's
-  BitChord id.
+- **Protocol.** BitChord speaks the Cast protocol directly (no Google Play
+  services library). The audio is a plain HTTP URL on the phone's local
+  network. The media's `contentId` is that URL, and `media.customData.mediaId`
+  is the track's BitChord id.
 - **Lyrics.** Lyrics arrive on the custom channel
   `urn:x-cast:com.music.bitchord` as one JSON message per track:
   `{"type":"lyrics","mediaId":…,"synced":bool,"lines":[{"t":ms,"text":…,"align":"end"?,"words":[{"s":ms,"text":…}]?}]}`.

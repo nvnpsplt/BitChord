@@ -3,11 +3,11 @@ package com.music.bitchord.playback.cast
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
-import androidx.media3.cast.RemoteCastPlayer
+import android.os.SystemClock
 import androidx.media3.common.C
+import androidx.media3.common.DeviceInfo
 import androidx.media3.common.ForwardingSimpleBasePlayer
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer.PositionSupplier
@@ -28,26 +28,20 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * What the media session talks to while a cast device is playing.
  *
  * ## Why the queue stays on the phone
  *
- * The obvious design — hand the whole queue to the receiver and point the
- * session at [RemoteCastPlayer] — would switch off most of this app. AutoPlay's
- * refill, the user-queue tiers, shuffle, "sleep after this song", scrobbling,
- * history, Discord, lyrics on the lock screen: every one of them is written
- * against the local ExoPlayer's queue and its callbacks, in
- * [com.music.bitchord.playback.PlaybackService] and the classes around it.
- *
- * So the local player keeps the queue — it stays the single source of truth for
- * *what* plays — and is simply kept silent, in `STATE_IDLE`, where it resolves
- * nothing, holds no audio focus and renders nothing. The receiver is told about
- * only the few tracks around the playhead: the current one and the next, so it
- * can preload and run straight into it. Everything that edits the queue edits
- * the local player exactly as it always has, and this reconciles the receiver
- * to it afterwards.
+ * The local ExoPlayer keeps the queue — AutoPlay's refill, the user-queue
+ * tiers, shuffle, "sleep after this song", scrobbling, history, Discord and the
+ * lock-screen lyric line are all written against it and its callbacks — and is
+ * held silent in `STATE_IDLE`, where it resolves nothing, holds no audio focus
+ * and renders nothing. The receiver is handed one track at a time over a
+ * [CastSession], and everything that edits the queue edits the local player
+ * exactly as it always has; this reconciles the receiver to it afterwards.
  *
  * ## Who owns what
  *
@@ -68,7 +62,6 @@ import kotlinx.coroutines.withContext
 @UnstableApi
 internal class CastBridgePlayer(
     local: Player,
-    private val remote: RemoteCastPlayer,
     private val server: CastMediaServer,
     private val host: Host,
 ) : ForwardingSimpleBasePlayer(local) {
@@ -88,12 +81,15 @@ internal class CastBridgePlayer(
 
         /** The receiver played the last track of the queue to its end. */
         fun onRemoteQueueEnded()
+
+        /** A new track was handed to the receiver — the moment to send it that track's lyrics. */
+        fun onRemoteTrackLoaded(mediaId: String)
     }
 
     /** Whether this is bridging to a receiver right now. */
-    var active: Boolean = false
-        private set
+    val active: Boolean get() = session != null
 
+    private var session: CastSession? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var scope = newScope()
     private var syncJob: Job? = null
@@ -102,6 +98,9 @@ internal class CastBridgePlayer(
     /** True while the receiver is being handed a new current track. */
     private var loading = false
 
+    /** The URL just handed to the receiver, until the receiver reports on it. */
+    private var pendingLoadUrl: String? = null
+
     /** Set while this class moves the local player itself, so it does not echo the move back. */
     private var applyingOwnChange = 0
 
@@ -109,11 +108,15 @@ internal class CastBridgePlayer(
     private var seekedSinceSync = false
 
     /**
-     * The URL just handed to the receiver, until the receiver reports on it.
-     * Between the two it still reads as idle, and without this a queue edit in
-     * that moment would load the same track a second time from the top.
+     * When this phone last told the receiver to play or pause. A receiver
+     * state that disagrees with the local intent long after that is somebody
+     * else's doing — the TV remote, Google Home — and is mirrored back.
      */
-    private var pendingLoadUrl: String? = null
+    private var lastTransportCommandAt = 0L
+
+    /** The receiver's last reported state and track, to see what changed in a status. */
+    private var lastState: CastProtocol.PlayerState? = null
+    private var lastContentId: String? = null
 
     private var lastReportedPlaying = false
     private var consecutiveFailures = 0
@@ -122,7 +125,7 @@ internal class CastBridgePlayer(
     private val localListener = object : Player.Listener {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
             if (!active) return
-            if (remote.playWhenReady != playWhenReady) remote.playWhenReady = playWhenReady
+            applyTransport(playWhenReady)
             if (playWhenReady && !remoteHasCurrent()) requestSync()
         }
 
@@ -141,7 +144,7 @@ internal class CastBridgePlayer(
             // A seek within the track the receiver is already playing is just a
             // seek there too; anything else is a new track and a full reload.
             if (oldPosition.mediaItemIndex == newPosition.mediaItemIndex && remoteHasCurrent()) {
-                remote.seekTo(newPosition.positionMs.coerceAtLeast(0L))
+                session?.seek(newPosition.positionMs.coerceAtLeast(0L))
                 invalidateState()
             } else {
                 requestSync()
@@ -156,14 +159,6 @@ internal class CastBridgePlayer(
             if (active) requestSync()
         }
 
-        override fun onRepeatModeChanged(repeatMode: Int) {
-            if (active) requestSync()
-        }
-
-        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-            if (active) requestSync()
-        }
-
         override fun onPlaybackStateChanged(playbackState: Int) {
             // Something prepared the local player behind the bridge's back — a
             // recovery path, a stray prepare(). It must not play over the TV.
@@ -174,76 +169,23 @@ internal class CastBridgePlayer(
         }
     }
 
-    private val remoteListener = object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) {
-            if (!active) return
-            if (remoteIsLive() || remote.playbackState == Player.STATE_ENDED) pendingLoadUrl = null
-            invalidateState()
-            reportPlaying()
-        }
-
-        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-            if (!active || loading) return
-            // Paused or resumed from somewhere other than this phone: the TV's
-            // remote, Google Home, another phone on the same session.
-            if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_REMOTE &&
-                localPlayer().playWhenReady != playWhenReady
-            ) {
-                localPlayer().playWhenReady = playWhenReady
-            }
-        }
-
-        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            if (!active || reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) return
-            val local = localPlayer()
-            val next = local.nextMediaItemIndex
-            if (next == C.INDEX_UNSET) return
-            val expected = urlFor(local.getMediaItemAt(next)) ?: return
-            if (mediaItem?.localConfiguration?.uri?.toString() != expected) return
-            advanceLocal(next)
-        }
-
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            if (!active || loading || playbackState != Player.STATE_ENDED) return
-            val local = localPlayer()
-            if (remoteCurrentUrl() != urlFor(local.currentMediaItem)) return
-            val next = local.nextMediaItemIndex
-            if (next != C.INDEX_UNSET) {
-                // The receiver ran off the end of what it was given — the next
-                // track was not known yet when this one was loaded.
-                advanceLocal(next)
-            } else {
-                host.onRemoteQueueEnded()
-                invalidateState()
-            }
-        }
-
-        override fun onPlayerError(error: PlaybackException) {
-            if (!active || loading) return
-            pendingLoadUrl = null
-            TrackLog.d(TAG, "receiver failed: ${error.errorCodeName} ${error.message}")
-            onCurrentTrackFailed()
-        }
-    }
-
-    init {
-        remote.addListener(remoteListener)
-    }
-
     /**
-     * Starts bridging [local] to the receiver: silences it, points the session
-     * state at the receiver and hands the receiver the current track, from
-     * where the local player had got to.
+     * Starts bridging [local] to the receiver behind [session]: silences it,
+     * points the session state at the receiver and hands the receiver the
+     * current track, from where the local player had got to.
      */
-    fun activate(local: Player) {
+    fun activate(local: Player, session: CastSession) {
         if (active) return
         if (local !== player) setPlayer(local)
         scope = newScope()
-        active = true
+        this.session = session
         loading = false
+        pendingLoadUrl = null
         seekedSinceSync = true
         consecutiveFailures = 0
         lastReportedPlaying = false
+        lastState = null
+        lastContentId = null
         lastWindow = emptyList()
         player.addListener(localListener)
         applyingOwnChange++
@@ -261,9 +203,13 @@ internal class CastBridgePlayer(
      * track, for the local player to carry on from.
      */
     fun deactivate(): Long {
-        val position = currentRemotePositionOr(player.currentPosition)
+        val position = if (active && !loading && remoteHasCurrent(allowEnded = true)) {
+            session?.currentPositionMs() ?: player.currentPosition
+        } else {
+            player.currentPosition
+        }
         if (!active) return position
-        active = false
+        session = null
         scope.cancel()
         syncJob = null
         syncScheduled = false
@@ -297,9 +243,45 @@ internal class CastBridgePlayer(
         }
     }
 
-    fun releaseBridge() {
-        deactivate()
-        remote.removeListener(remoteListener)
+    // --- Receiver reports (from the controller, main thread) -----------------
+
+    fun onMediaStatus(status: CastProtocol.MediaStatus?) {
+        if (!active) return
+        val previousState = lastState
+        val previousContent = lastContentId
+        lastState = status?.playerState
+        lastContentId = status?.contentId
+        if (status != null && status.playerState != CastProtocol.PlayerState.IDLE) pendingLoadUrl = null
+
+        val expected = urlFor(player.currentMediaItem)
+        val aboutCurrent = status?.contentId != null && status?.contentId == expected
+
+        if (status != null && aboutCurrent && !loading) {
+            when {
+                status.playerState == CastProtocol.PlayerState.IDLE &&
+                    status.idleReason == "FINISHED" &&
+                    (previousState != CastProtocol.PlayerState.IDLE || previousContent != status.contentId) ->
+                    onRemoteFinished()
+                status.playerState == CastProtocol.PlayerState.IDLE && status.idleReason == "ERROR" -> {
+                    pendingLoadUrl = null
+                    TrackLog.d(TAG, "receiver could not play ${status.contentId}")
+                    onCurrentTrackFailed()
+                }
+                else -> mirrorRemoteTransport(status.playerState)
+            }
+        }
+        invalidateState()
+        reportPlaying()
+    }
+
+    fun onVolumeChanged() {
+        if (active) invalidateState()
+    }
+
+    fun onLoadFailed() {
+        if (!active || loading) return
+        pendingLoadUrl = null
+        onCurrentTrackFailed()
     }
 
     // --- Reported state ------------------------------------------------------
@@ -308,36 +290,37 @@ internal class CastBridgePlayer(
         // Nothing listens to this player while it is not casting — the
         // session is on the local player then — so it does not spend a state
         // diff on every local event just to be ignored.
-        if (!active) return INACTIVE_STATE
+        val cast = session ?: return INACTIVE_STATE
         val base = super.getState()
         val local = player
         val empty = local.currentTimeline.isEmpty
         val live = !loading && remoteHasCurrent(allowEnded = true)
-        val remoteState = remote.playbackState
+        val status = cast.mediaStatus
+        val finished = status?.playerState == CastProtocol.PlayerState.IDLE && status?.idleReason == "FINISHED"
         val playbackState = when {
             empty -> Player.STATE_IDLE
-            !live -> if (loading || local.playWhenReady) Player.STATE_BUFFERING else Player.STATE_READY
-            remoteState == Player.STATE_ENDED ->
+            !live || status == null -> if (loading || local.playWhenReady) Player.STATE_BUFFERING else Player.STATE_READY
+            finished ->
                 if (local.nextMediaItemIndex != C.INDEX_UNSET) Player.STATE_BUFFERING else Player.STATE_ENDED
-            remoteState == Player.STATE_IDLE ->
+            status?.playerState == CastProtocol.PlayerState.BUFFERING -> Player.STATE_BUFFERING
+            status?.playerState == CastProtocol.PlayerState.IDLE ->
                 if (local.playWhenReady) Player.STATE_BUFFERING else Player.STATE_READY
-            else -> remoteState
+            else -> Player.STATE_READY
         }
         val fallbackPosition = local.currentPosition.coerceAtLeast(0L)
         val position: PositionSupplier = if (live) {
-            PositionSupplier { remote.currentPosition.coerceAtLeast(0L) }
+            PositionSupplier { cast.currentPositionMs().coerceAtLeast(0L) }
         } else {
             PositionSupplier.getConstant(fallbackPosition)
         }
-        val buffered: PositionSupplier = if (live) {
-            PositionSupplier { maxOf(remote.bufferedPosition, remote.currentPosition).coerceAtLeast(0L) }
+        // The receiver does not report how far ahead it has buffered; the
+        // audio comes over the LAN from this phone's own cache, so the whole
+        // track is as good as there.
+        val durationMs = if (live) status?.durationMs else null
+        val buffered: PositionSupplier = if (live && durationMs != null) {
+            PositionSupplier.getConstant(durationMs)
         } else {
-            PositionSupplier.getConstant(fallbackPosition)
-        }
-        val totalBuffered: PositionSupplier = if (live) {
-            PositionSupplier { (remote.bufferedPosition - remote.currentPosition).coerceAtLeast(0L) }
-        } else {
-            PositionSupplier.ZERO
+            position
         }
         val commands = base.availableCommands.buildUpon()
             .addAll(
@@ -362,18 +345,13 @@ internal class CastBridgePlayer(
             .setAdPositionMs(position)
             .setContentBufferedPositionMs(buffered)
             .setAdBufferedPositionMs(buffered)
-            .setTotalBufferedDurationMs(totalBuffered)
-            .setDeviceInfo(remote.deviceInfo)
-            .setDeviceVolume(remote.deviceVolume)
-            .setIsDeviceMuted(remote.isDeviceMuted)
+            .setTotalBufferedDurationMs(PositionSupplier.ZERO)
+            .setDeviceInfo(REMOTE_DEVICE)
+            .setDeviceVolume((cast.volumeLevel * MAX_VOLUME).roundToInt().coerceIn(0, MAX_VOLUME))
+            .setIsDeviceMuted(cast.muted)
         if (!empty) {
-            val remoteDurationUs = if (live) {
-                remote.duration.takeIf { it != C.TIME_UNSET && it > 0 }?.let(Util::msToUs)
-            } else {
-                null
-            }
             builder.setPlaylist(
-                RemoteTimeline(local.currentTimeline, local.currentMediaItemIndex, remoteDurationUs),
+                RemoteTimeline(local.currentTimeline, local.currentMediaItemIndex, durationMs?.let(Util::msToUs)),
                 Tracks.EMPTY,
                 local.mediaMetadata,
             )
@@ -400,7 +378,7 @@ internal class CastBridgePlayer(
 
     override fun handleStop(): ListenableFuture<*> {
         if (!active) return super.handleStop()
-        remote.stop()
+        session?.stopMedia()
         return Futures.immediateVoidFuture()
     }
 
@@ -420,37 +398,35 @@ internal class CastBridgePlayer(
 
     override fun handleSetPlaybackParameters(playbackParameters: PlaybackParameters): ListenableFuture<*> {
         val result = super.handleSetPlaybackParameters(playbackParameters)
-        if (active) {
-            val speed = playbackParameters.speed.coerceIn(
-                RemoteCastPlayer.MIN_SPEED_SUPPORTED,
-                RemoteCastPlayer.MAX_SPEED_SUPPORTED,
-            )
-            remote.playbackParameters = PlaybackParameters(speed)
-        }
+        if (active) session?.setPlaybackRate(playbackParameters.speed.coerceIn(MIN_SPEED, MAX_SPEED).toDouble())
         return result
     }
 
     override fun handleSetDeviceVolume(deviceVolume: Int, flags: Int): ListenableFuture<*> {
-        if (!active) return super.handleSetDeviceVolume(deviceVolume, flags)
-        remote.setDeviceVolume(deviceVolume, flags)
+        val cast = session ?: return super.handleSetDeviceVolume(deviceVolume, flags)
+        cast.setVolume(deviceVolume.toDouble() / MAX_VOLUME)
+        invalidateState()
         return Futures.immediateVoidFuture()
     }
 
     override fun handleIncreaseDeviceVolume(flags: Int): ListenableFuture<*> {
-        if (!active) return super.handleIncreaseDeviceVolume(flags)
-        remote.increaseDeviceVolume(flags)
+        val cast = session ?: return super.handleIncreaseDeviceVolume(flags)
+        cast.setVolume(cast.volumeLevel + 1.0 / MAX_VOLUME)
+        invalidateState()
         return Futures.immediateVoidFuture()
     }
 
     override fun handleDecreaseDeviceVolume(flags: Int): ListenableFuture<*> {
-        if (!active) return super.handleDecreaseDeviceVolume(flags)
-        remote.decreaseDeviceVolume(flags)
+        val cast = session ?: return super.handleDecreaseDeviceVolume(flags)
+        cast.setVolume(cast.volumeLevel - 1.0 / MAX_VOLUME)
+        invalidateState()
         return Futures.immediateVoidFuture()
     }
 
     override fun handleSetDeviceMuted(muted: Boolean, flags: Int): ListenableFuture<*> {
-        if (!active) return super.handleSetDeviceMuted(muted, flags)
-        remote.setDeviceMuted(muted, flags)
+        val cast = session ?: return super.handleSetDeviceMuted(muted, flags)
+        cast.setMuted(muted)
+        invalidateState()
         return Futures.immediateVoidFuture()
     }
 
@@ -474,11 +450,12 @@ internal class CastBridgePlayer(
     }
 
     private suspend fun reconcile() {
-        val local = player
+        val cast = session ?: return
+        val local = localPlayer()
         val index = local.currentMediaItemIndex
         val current = local.currentMediaItem
         if (local.mediaItemCount == 0 || index == C.INDEX_UNSET || current == null) {
-            if (remote.mediaItemCount > 0) remote.clearMediaItems()
+            cast.stopMedia()
             invalidateState()
             return
         }
@@ -488,29 +465,21 @@ internal class CastBridgePlayer(
             TrackLog.d(TAG, "nothing to cast from: address=$address source=$currentSource")
             return
         }
-        val repeatOne = local.repeatMode == Player.REPEAT_MODE_ONE
-        val wantedRepeat = if (repeatOne) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
-        if (remote.repeatMode != wantedRepeat) remote.repeatMode = wantedRepeat
-        val next = if (repeatOne) {
-            null
-        } else {
-            local.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let(local::getMediaItemAt)
-        }
+        val next = local.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET }?.let(local::getMediaItemAt)
         val nextSource = next?.localConfiguration?.uri
 
-        // The window just left stays served too: the receiver may still be
-        // reading the track it is moving away from when this runs.
+        // Next track's URL is kept served and resolved ahead, so the receiver
+        // starts it quickly; the window just left stays served too, since the
+        // receiver may still be reading it when this runs.
         val window = listOfNotNull(currentSource, nextSource)
         server.retainOnly((window + lastWindow).distinct())
         lastWindow = window
 
         val currentUrl = server.audioUrl(address, currentSource) ?: return
-        val nextUrl = nextSource?.let { server.audioUrl(address, it) }
-
         if (remoteHasCurrent(currentUrl)) {
-            reconcileTail(next, nextSource, nextUrl, address)
             seekedSinceSync = false
             invalidateState()
+            nextSource?.let { source -> scope.launch(Dispatchers.IO) { server.probe(source) } }
             return
         }
 
@@ -518,7 +487,10 @@ internal class CastBridgePlayer(
         // nobody has asked to hear it again. A track arriving now — AutoPlay
         // topping the queue up after it ran dry, or the listener adding one —
         // is simply what plays next.
-        if (!seekedSinceSync && remote.playbackState == Player.STATE_ENDED && remoteCurrentUrl() == currentUrl) {
+        val status = cast.mediaStatus
+        if (!seekedSinceSync && status?.playerState == CastProtocol.PlayerState.IDLE &&
+            status?.idleReason == "FINISHED" && status?.contentId == currentUrl
+        ) {
             if (next != null) advanceLocal(local.nextMediaItemIndex)
             return
         }
@@ -527,72 +499,65 @@ internal class CastBridgePlayer(
         // from an explicit seek (a skip lands at 0), otherwise from wherever
         // the receiver had got to in this same song — a version swap replaces
         // the item without moving the playhead.
-        val sameSong = remote.currentMediaItem?.mediaId == current.mediaId && remoteIsLive()
+        val sameSong = lastLoadedMediaId == current.mediaId && remoteIsLive()
         val startPosition = if (!seekedSinceSync && sameSong) {
-            remote.currentPosition
+            cast.currentPositionMs()
         } else {
             local.currentPosition
         }.coerceAtLeast(0L)
 
         loading = true
         invalidateState()
-        val currentItem = remoteItemFor(current, currentSource, currentUrl, address)
-        if (currentItem == null) {
+        val mimeType = withContext(Dispatchers.IO) { server.probe(currentSource) }
+        if (session !== cast) return
+        if (mimeType == null) {
             loading = false
             invalidateState()
             onCurrentTrackFailed()
             return
         }
-        val nextItem = if (next != null && nextSource != null && nextUrl != null) {
-            remoteItemFor(next, nextSource, nextUrl, address)
-        } else {
-            null
-        }
-        remote.playWhenReady = local.playWhenReady
+        val metadata = current.mediaMetadata
         pendingLoadUrl = currentUrl
-        remote.setMediaItems(listOfNotNull(currentItem, nextItem), 0, startPosition)
-        remote.prepare()
+        lastLoadedMediaId = current.mediaId
+        lastTransportCommandAt = SystemClock.elapsedRealtime()
+        cast.load(
+            CastProtocol.LoadRequest(
+                url = currentUrl,
+                contentType = mimeType,
+                mediaId = current.mediaId,
+                title = metadata.title?.toString(),
+                artist = metadata.artist?.toString(),
+                album = metadata.albumTitle?.toString(),
+                artworkUrl = server.artworkUrl(address, metadata.artworkUri)?.toString(),
+                startPositionMs = startPosition,
+                autoplay = local.playWhenReady,
+            ),
+        )
+        host.onRemoteTrackLoaded(current.mediaId)
         loading = false
         seekedSinceSync = false
         invalidateState()
+        // Resolve the next track now, while this one plays, so the hop to it
+        // is a LAN fetch rather than a stream lookup.
+        nextSource?.let { source -> scope.launch(Dispatchers.IO) { server.probe(source) } }
     }
 
-    /** The receiver already has the current track; make what follows it match. */
-    private suspend fun reconcileTail(next: MediaItem?, nextSource: Uri?, nextUrl: String?, address: String) {
-        val currentIndex = remote.currentMediaItemIndex
-        if (currentIndex > 0) remote.removeMediaItems(0, currentIndex)
-        val tail = (1 until remote.mediaItemCount).map {
-            remote.getMediaItemAt(it).localConfiguration?.uri?.toString()
+    private var lastLoadedMediaId: String? = null
+
+    private fun onRemoteFinished() {
+        val local = localPlayer()
+        if (local.repeatMode == Player.REPEAT_MODE_ONE) {
+            // Same track again, from the top: a seek on the local player
+            // reloads it on the receiver.
+            local.seekTo(local.currentMediaItemIndex, 0L)
+            return
         }
-        if (tail == listOfNotNull(nextUrl)) return
-        val nextItem = if (next != null && nextSource != null && nextUrl != null) {
-            remoteItemFor(next, nextSource, nextUrl, address)
+        val next = local.nextMediaItemIndex
+        if (next != C.INDEX_UNSET) {
+            advanceLocal(next)
         } else {
-            null
+            host.onRemoteQueueEnded()
         }
-        if (!active) return
-        if (remote.mediaItemCount > 1) remote.removeMediaItems(1, remote.mediaItemCount)
-        if (nextItem != null) remote.addMediaItem(nextItem)
-    }
-
-    /**
-     * The receiver's copy of [item]: the proxy URL, the content type the bytes
-     * turned out to be, and the metadata the TV shows. Null when the track
-     * cannot be played there — nothing resolved, or a format the receiver
-     * cannot decode.
-     */
-    private suspend fun remoteItemFor(item: MediaItem, source: Uri, url: String, address: String): MediaItem? {
-        val mimeType = withContext(Dispatchers.IO) { server.probe(source) } ?: return null
-        val metadata = item.mediaMetadata.buildUpon()
-            .setArtworkUri(server.artworkUrl(address, item.mediaMetadata.artworkUri))
-            .setArtworkData(null, null)
-            .build()
-        return MediaItem.Builder()
-            .setMediaId(item.mediaId)
-            .setUri(url)
-            .setMimeType(mimeType)
-            .setMediaMetadata(metadata)
-            .build()
     }
 
     private fun advanceLocal(index: Int) {
@@ -605,6 +570,7 @@ internal class CastBridgePlayer(
             }
         }
         consecutiveFailures = 0
+        seekedSinceSync = true
         requestSync()
     }
 
@@ -615,19 +581,45 @@ internal class CastBridgePlayer(
      */
     private fun onCurrentTrackFailed() {
         consecutiveFailures++
-        pendingLoadUrl = null
         CastStatus.showNotice(R.string.cast_track_skipped)
-        val next = player.nextMediaItemIndex
+        val local = localPlayer()
+        val next = local.nextMediaItemIndex
         if (consecutiveFailures < MAX_CONSECUTIVE_FAILURES && next != C.INDEX_UNSET) {
-            player.seekTo(next, 0L)
+            local.seekTo(next, 0L)
         } else {
-            player.playWhenReady = false
+            local.playWhenReady = false
             consecutiveFailures = 0
         }
     }
 
+    /** The local intent, sent to the receiver. */
+    private fun applyTransport(playWhenReady: Boolean) {
+        val cast = session ?: return
+        val state = cast.mediaStatus?.playerState ?: return
+        if (playWhenReady && state == CastProtocol.PlayerState.PAUSED) {
+            lastTransportCommandAt = SystemClock.elapsedRealtime()
+            cast.play()
+        } else if (!playWhenReady &&
+            (state == CastProtocol.PlayerState.PLAYING || state == CastProtocol.PlayerState.BUFFERING)
+        ) {
+            lastTransportCommandAt = SystemClock.elapsedRealtime()
+            cast.pause()
+        }
+    }
+
+    /** A pause or resume that did not come from this phone, reflected back onto it. */
+    private fun mirrorRemoteTransport(state: CastProtocol.PlayerState) {
+        if (SystemClock.elapsedRealtime() - lastTransportCommandAt < OWN_COMMAND_GRACE_MS) return
+        val local = localPlayer()
+        when {
+            state == CastProtocol.PlayerState.PAUSED && local.playWhenReady -> local.playWhenReady = false
+            state == CastProtocol.PlayerState.PLAYING && !local.playWhenReady -> local.playWhenReady = true
+        }
+    }
+
     private fun reportPlaying() {
-        val playing = remote.isPlaying && !loading && remoteHasCurrent()
+        val playing = session?.mediaStatus?.playerState == CastProtocol.PlayerState.PLAYING &&
+            !loading && remoteHasCurrent()
         if (playing == lastReportedPlaying) return
         lastReportedPlaying = playing
         if (playing) consecutiveFailures = 0
@@ -640,10 +632,10 @@ internal class CastBridgePlayer(
         return server.audioUrl(address, source)
     }
 
-    private fun remoteCurrentUrl(): String? = remote.currentMediaItem?.localConfiguration?.uri?.toString()
-
-    private fun remoteIsLive(): Boolean =
-        remote.playbackState == Player.STATE_BUFFERING || remote.playbackState == Player.STATE_READY
+    private fun remoteIsLive(): Boolean {
+        val state = session?.mediaStatus?.playerState ?: return false
+        return state != CastProtocol.PlayerState.IDLE
+    }
 
     /**
      * Whether the receiver has the local player's current track loaded.
@@ -655,16 +647,12 @@ internal class CastBridgePlayer(
         allowEnded: Boolean = false,
     ): Boolean {
         expectedUrl ?: return false
-        val state = remote.playbackState
-        if (state == Player.STATE_IDLE) {
-            return pendingLoadUrl == expectedUrl && remoteCurrentUrl() == expectedUrl
-        }
-        if (state == Player.STATE_ENDED && !allowEnded) return false
-        return remoteCurrentUrl() == expectedUrl
+        if (pendingLoadUrl == expectedUrl) return true
+        val status = session?.mediaStatus ?: return false
+        if (status.contentId != expectedUrl) return false
+        if (status.playerState != CastProtocol.PlayerState.IDLE) return true
+        return allowEnded && status.idleReason == "FINISHED"
     }
-
-    private fun currentRemotePositionOr(fallback: Long): Long =
-        if (active && !loading && remoteHasCurrent(allowEnded = true)) remote.currentPosition else fallback
 
     /** The wrapped local player, for code outside this class's own body (listeners, lambdas). */
     private fun localPlayer(): Player = player
@@ -707,6 +695,16 @@ internal class CastBridgePlayer(
     private companion object {
         const val TAG = "BitChordCast"
         const val MAX_CONSECUTIVE_FAILURES = 3
+        const val MAX_VOLUME = 20
+        const val MIN_SPEED = 0.5f
+        const val MAX_SPEED = 2.0f
+
+        /** How long a receiver state that contradicts our own last command is put down to latency. */
+        const val OWN_COMMAND_GRACE_MS = 2_500L
+
+        val REMOTE_DEVICE: DeviceInfo = DeviceInfo.Builder(DeviceInfo.PLAYBACK_TYPE_REMOTE)
+            .setMaxVolume(MAX_VOLUME)
+            .build()
 
         /** What an idle bridge reports: no queue, not playing. */
         val INACTIVE_STATE: State = State.Builder()
