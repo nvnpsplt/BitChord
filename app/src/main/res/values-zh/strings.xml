@@ -1287,6 +1287,21 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">投放</string>
+    <string name="cast_searching">正在搜索 Wi-Fi 上的设备…</string>
+    <string name="cast_connecting">正在连接…</string>
+    <string name="cast_casting">正在投放</string>
+    <string name="cast_casting_to">正在投放到 %1$s</string>
+    <string name="cast_stop">停止投放</string>
+    <string name="cast_local_effects_note">均衡器、淡入淡出、Automix 和空间音频在这部手机上运行，因此投放时会暂停。</string>
+    <string name="cast_blocked_party">Listen Together 期间无法投放</string>
+    <string name="cast_track_skipped">已跳过投放设备无法播放的歌曲</string>
+    <string name="cast_connect_failed">无法开始投放。请确认手机和投放设备连接到同一个 Wi-Fi。</string>
+    <string name="cast_feature_unavailable">投放时不可用</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">在输出选择中显示 Chromecast 和 Google Cast 设备</string>
+    <string name="cast_continue_title">投放结束后继续播放</string>
+    <string name="cast_continue_subtitle">投放会话结束时，在这部手机上继续播放</string>
 
 </resources>

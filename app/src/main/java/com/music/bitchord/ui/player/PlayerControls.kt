@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.draw.drawWithContent
+import com.music.bitchord.playback.cast.CastStatus
 import com.music.bitchord.R
 
 import android.media.AudioFormat
@@ -54,6 +55,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.VolumeDown
 import androidx.compose.material.icons.automirrored.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.CastConnected
 import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material3.CircularProgressIndicator
@@ -799,12 +801,21 @@ private fun OutputPartyPill(
     onOpenMembers: () -> Unit,
 ) {
     val badge = rememberPartyBadge()
+    val cast by CastStatus.current.collectAsStateWithLifecycle()
     Pill {
         PillSegment(
-            icon = Icons.Rounded.Headphones,
+            // Lit with the cast glyph while a TV or speaker is playing, so the
+            // one button that stops it says it is running.
+            icon = if (cast.isActive) Icons.Rounded.CastConnected else Icons.Rounded.Headphones,
             iconSize = PILL_HEADPHONES_SIZE,
-            contentDescription = stringResource(R.string.audio_output),
+            contentDescription = if (cast.isActive) {
+                cast.deviceName?.let { stringResource(R.string.cast_casting_to, it) }
+                    ?: stringResource(R.string.cast_casting)
+            } else {
+                stringResource(R.string.audio_output)
+            },
             onClick = onOutput,
+            highlighted = cast.isCasting,
         )
         PillDivider()
         PillSegment(
@@ -943,7 +954,14 @@ internal fun OutputCaption(
     onOpenMembers: () -> Unit,
 ) {
     val badge = rememberPartyBadge()
-    val outputName = rememberAudioOutputName(accountName)
+    val cast by CastStatus.current.collectAsStateWithLifecycle()
+    val phoneOutputName = rememberAudioOutputName(accountName)
+    val outputName = when {
+        cast.isCasting -> cast.deviceName?.let { stringResource(R.string.cast_casting_to, it) }
+            ?: stringResource(R.string.cast_casting)
+        cast.phase == CastStatus.Phase.CONNECTING -> stringResource(R.string.cast_connecting)
+        else -> phoneOutputName
+    }
     val outputStatus by AudioOutputStatus.current.collectAsStateWithLifecycle()
     val nerdStats by NerdStats.current.collectAsStateWithLifecycle()
     // What the route is *capable* of, read off the negotiated AudioTrack —
@@ -972,7 +990,8 @@ internal fun OutputCaption(
     // track under it is. The shine means the device is receiving this music
     // at the quality it was sent in.
     val streamIsHiRes = nerdStats?.isHiRes == true
-    val isHiResOutput = streamIsHiRes && routeCarriesHiRes
+    // Neither half is known while casting: the receiver decodes, not us.
+    val isHiResOutput = streamIsHiRes && routeCarriesHiRes && !cast.isActive
     // The host's first name, exactly as the output line already shortens the
     // account's — "Kushagra's Jam" alongside "Kushagra's Phone".
     val jamName = badge.hostFirstName

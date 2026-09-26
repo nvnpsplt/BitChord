@@ -31,6 +31,8 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Notes
 import androidx.compose.material.icons.automirrored.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.CastConnected
+import androidx.compose.material.icons.rounded.Cast
 import androidx.compose.material.icons.rounded.Animation
 import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -189,6 +191,8 @@ fun SettingsScreen(
     val smartFade by AppSettings.smartFadeEnabled.collectAsStateWithLifecycle()
     val automixPerformance by AppSettings.automixPerformanceMode.collectAsStateWithLifecycle()
     val skipSilence by AppSettings.skipSilence.collectAsStateWithLifecycle()
+    val castEnabled by AppSettings.castEnabled.collectAsStateWithLifecycle()
+    val castContinueOnPhone by AppSettings.castContinueOnPhone.collectAsStateWithLifecycle()
     val dolbyAtmos by AppSettings.dolbyAtmos.collectAsStateWithLifecycle()
     // A property of the hardware, so it is read once rather than remembered
     // against a key that can never change — see [DeviceCodecs.playsDolbyAtmos],
@@ -680,6 +684,44 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setSkipSilence(!skipSilence) },
+                )
+            }
+            val castTitle = stringResource(R.string.cast_setting_title)
+            row(castTitle, "cast", "chromecast", "tv", "speaker") {
+                SettingsRow(
+                    icon = Icons.Rounded.Cast,
+                    title = castTitle,
+                    subtitle = stringResource(R.string.cast_setting_subtitle),
+                    trailing = {
+                        Switch(
+                            checked = castEnabled,
+                            onCheckedChange = AppSettings::setCastEnabled,
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                checkedBorderColor = MaterialTheme.colorScheme.primary,
+                            ),
+                        )
+                    },
+                    onClick = { AppSettings.setCastEnabled(!castEnabled) },
+                )
+            }
+            val castContinueTitle = stringResource(R.string.cast_continue_title)
+            row(castContinueTitle, "cast", "chromecast", "resume") {
+                SettingsRow(
+                    icon = Icons.Rounded.CastConnected,
+                    title = castContinueTitle,
+                    subtitle = stringResource(R.string.cast_continue_subtitle),
+                    trailing = {
+                        Switch(
+                            checked = castContinueOnPhone,
+                            onCheckedChange = AppSettings::setCastContinueOnPhone,
+                            colors = SwitchDefaults.colors(
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                checkedBorderColor = MaterialTheme.colorScheme.primary,
+                            ),
+                        )
+                    },
+                    onClick = { AppSettings.setCastContinueOnPhone(!castContinueOnPhone) },
                 )
             }
             val spatialAudioTitle = stringResource(R.string.spatial_audio)

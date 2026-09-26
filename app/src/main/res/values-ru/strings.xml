@@ -1333,6 +1333,21 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Трансляция</string>
+    <string name="cast_searching">Поиск устройств в вашей сети Wi-Fi…</string>
+    <string name="cast_connecting">Подключение…</string>
+    <string name="cast_casting">Идёт трансляция</string>
+    <string name="cast_casting_to">Трансляция на %1$s</string>
+    <string name="cast_stop">Остановить трансляцию</string>
+    <string name="cast_local_effects_note">Эквалайзер, кроссфейд, Automix и пространственный звук работают на этом телефоне, поэтому во время трансляции они приостановлены.</string>
+    <string name="cast_blocked_party">Трансляция недоступна во время Listen Together</string>
+    <string name="cast_track_skipped">Пропущен трек, который устройство не смогло воспроизвести</string>
+    <string name="cast_connect_failed">Не удалось начать трансляцию. Убедитесь, что телефон и устройство подключены к одной сети Wi-Fi.</string>
+    <string name="cast_feature_unavailable">Недоступно во время трансляции</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Показывать устройства Chromecast и Google Cast при выборе вывода</string>
+    <string name="cast_continue_title">Продолжать после трансляции</string>
+    <string name="cast_continue_subtitle">Когда трансляция заканчивается, продолжать воспроизведение на этом телефоне</string>
 
 </resources>

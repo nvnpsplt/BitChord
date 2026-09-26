@@ -1307,6 +1307,21 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">कास्ट</string>
+    <string name="cast_searching">आपके Wi-Fi पर डिवाइस खोजे जा रहे हैं…</string>
+    <string name="cast_connecting">कनेक्ट हो रहा है…</string>
+    <string name="cast_casting">कास्ट हो रहा है</string>
+    <string name="cast_casting_to">%1$s पर कास्ट हो रहा है</string>
+    <string name="cast_stop">कास्ट करना बंद करें</string>
+    <string name="cast_local_effects_note">इक्वलाइज़र, क्रॉसफ़ेड, Automix और स्पेशियल ऑडियो इस फ़ोन पर चलते हैं, इसलिए कास्ट करते समय ये रुक जाते हैं।</string>
+    <string name="cast_blocked_party">Listen Together के दौरान कास्ट उपलब्ध नहीं है</string>
+    <string name="cast_track_skipped">एक गाना छोड़ा गया जिसे कास्ट डिवाइस नहीं चला सका</string>
+    <string name="cast_connect_failed">कास्ट शुरू नहीं हो सका। पक्का करें कि फ़ोन और कास्ट डिवाइस एक ही Wi-Fi पर हों।</string>
+    <string name="cast_feature_unavailable">कास्ट करते समय उपलब्ध नहीं</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">आउटपुट चुनने में Chromecast और Google Cast डिवाइस दिखाएं</string>
+    <string name="cast_continue_title">कास्ट के बाद बजाते रहें</string>
+    <string name="cast_continue_subtitle">कास्ट सेशन खत्म होने पर इस फ़ोन से बजाना जारी रखें</string>
 
 </resources>

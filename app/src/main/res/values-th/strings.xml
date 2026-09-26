@@ -1294,5 +1294,21 @@
 
     <string name="card_songs_format">%1$s songs</string>
 
+    <!-- Google Cast -->
+    <string name="cast_section_title">แคสต์</string>
+    <string name="cast_searching">กำลังค้นหาอุปกรณ์ใน Wi-Fi ของคุณ…</string>
+    <string name="cast_connecting">กำลังเชื่อมต่อ…</string>
+    <string name="cast_casting">กำลังแคสต์</string>
+    <string name="cast_casting_to">กำลังแคสต์ไปยัง %1$s</string>
+    <string name="cast_stop">หยุดแคสต์</string>
+    <string name="cast_local_effects_note">อีควอไลเซอร์ ครอสเฟด Automix และเสียงรอบทิศทางทำงานบนโทรศัพท์เครื่องนี้ จึงหยุดชั่วคราวขณะแคสต์</string>
+    <string name="cast_blocked_party">ไม่สามารถแคสต์ระหว่าง Listen Together</string>
+    <string name="cast_track_skipped">ข้ามเพลงที่อุปกรณ์แคสต์เล่นไม่ได้</string>
+    <string name="cast_connect_failed">เริ่มแคสต์ไม่ได้ ตรวจสอบว่าโทรศัพท์และอุปกรณ์อยู่ใน Wi-Fi เดียวกัน</string>
+    <string name="cast_feature_unavailable">ใช้ไม่ได้ขณะแคสต์</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">แสดงอุปกรณ์ Chromecast และ Google Cast ในตัวเลือกเอาต์พุต</string>
+    <string name="cast_continue_title">เล่นต่อหลังแคสต์</string>
+    <string name="cast_continue_subtitle">เมื่อเซสชันแคสต์สิ้นสุด ให้เล่นต่อจากโทรศัพท์เครื่องนี้</string>
 
 </resources>
