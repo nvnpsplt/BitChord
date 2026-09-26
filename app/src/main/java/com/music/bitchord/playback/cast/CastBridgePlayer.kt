@@ -540,7 +540,7 @@ internal class CastBridgePlayer(
             seekedSinceSync = false
             invalidateState()
             val queueNext = if (local.repeatMode == Player.REPEAT_MODE_ONE) null else next
-            // A DLNA renderer plays one track at a time; the next is loaded when its turn comes.
+            // A renderer with no next-track slot (some DLNA ones) loads each track when its turn comes.
             if (cast.supportsQueue) reconcileQueue(cast, queueNext, address)
             return
         }

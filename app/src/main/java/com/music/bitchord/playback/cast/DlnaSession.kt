@@ -21,7 +21,8 @@ import kotlin.math.roundToInt
  * A renderer does not report its state; it is asked. So this polls transport
  * state and position once a second and turns the answers into the same
  * [CastProtocol.MediaStatus] a Cast receiver sends, which is all the bridge
- * reads. A renderer plays one track at a time: there is no queue, so the next
+ * reads. Where the renderer takes one (SetNextAVTransportURI), the next track
+ * is handed over ahead so it runs straight on; where it does not, the next
  * track is loaded when the current one finishes.
  *
  * Commands are called on the main thread and run in order on a worker thread;
@@ -47,7 +48,13 @@ internal class DlnaSession(
     private var mediaStatusAt = 0L
 
     override val queueItemIds: List<Int> get() = emptyList()
-    override val supportsQueue: Boolean get() = false
+    /**
+     * Whether the renderer takes a next track ahead of time
+     * (SetNextAVTransportURI, optional in UPnP AV). Assumed until it refuses one.
+     */
+    override val supportsQueue: Boolean get() = nextSupported
+
+    @Volatile private var nextSupported = true
     override val supportsCustomMessages: Boolean get() = false
 
     override var volumeLevel: Double = 1.0
@@ -58,6 +65,12 @@ internal class DlnaSession(
 
     // What was last loaded, and how it has gone since. Main thread.
     private var loadedUrl: String? = null
+
+    /** The track handed over with SetNextAVTransportURI, to start when this one ends. Main thread. */
+    private var nextUrl: String? = null
+    private var nextRequest: CastProtocol.LoadRequest? = null
+    private var lastPositionMs: Long? = null
+    private var lastDurationMs: Long? = null
     private var mediaSessionId = 0
     private var loadedAt = 0L
     private var sawPlaying = false
@@ -101,6 +114,11 @@ internal class DlnaSession(
     override fun load(request: CastProtocol.LoadRequest) {
         mediaSessionId++
         loadedUrl = request.url
+        // A new transport URI replaces whatever was set to follow the old one.
+        nextUrl = null
+        nextRequest = null
+        lastPositionMs = null
+        lastDurationMs = null
         loadedAt = SystemClock.elapsedRealtime()
         sawPlaying = false
         stopRequested = false
@@ -143,9 +161,56 @@ internal class DlnaSession(
         }
     }
 
-    override fun queueNext(request: CastProtocol.LoadRequest) = Unit
-    override fun queueRemove(itemIds: List<Int>) = Unit
-    override fun queueSkip() = Unit
+    override fun queueNext(request: CastProtocol.LoadRequest) {
+        if (!nextSupported) return
+        nextUrl = request.url
+        nextRequest = request
+        submit {
+            if (closed) return@submit
+            try {
+                call(
+                    Dlna.AV_TRANSPORT,
+                    renderer.avTransportUrl,
+                    "SetNextAVTransportURI",
+                    instance() + listOf("NextURI" to request.url, "NextURIMetaData" to Dlna.didl(request)),
+                )
+            } catch (e: Exception) {
+                // Not every renderer has it: from now on the next track is
+                // loaded when this one finishes, as the bridge does without a queue.
+                TrackLog.d(TAG, "DLNA renderer takes no next track: ${e.message}")
+                nextSupported = false
+                main.post { if (nextUrl == request.url) nextUrl = null }
+            }
+        }
+    }
+
+    /** Clears the next track: the bridge only removes items to replace or drop what follows. */
+    override fun queueRemove(itemIds: List<Int>) {
+        if (!nextSupported || nextUrl == null) return
+        nextUrl = null
+        nextRequest = null
+        submit {
+            if (closed) return@submit
+            runCatching {
+                call(
+                    Dlna.AV_TRANSPORT,
+                    renderer.avTransportUrl,
+                    "SetNextAVTransportURI",
+                    instance() + listOf("NextURI" to "", "NextURIMetaData" to ""),
+                )
+            }
+        }
+    }
+
+    /**
+     * Starts the next track now — as a plain load: UPnP's Next action means
+     * "next in the renderer's playlist", which not every renderer applies to
+     * a next URI.
+     */
+    override fun queueSkip() {
+        val request = nextRequest?.takeIf { it.url == nextUrl } ?: return
+        load(request.copy(startPositionMs = 0, autoplay = true))
+    }
 
     override fun play() {
         command(Dlna.AV_TRANSPORT, "Play", instance() + ("Speed" to "1"))
@@ -163,7 +228,10 @@ internal class DlnaSession(
     override fun seek(positionMs: Long) {
         val target = positionMs.coerceAtLeast(0)
         submit { if (!closed) runCatching { seekNow(target) } }
-        // Reflected straight away: the next poll confirms it.
+        // Reflected straight away: the next poll confirms it. Also taken as the
+        // last known playhead, so a seek back to the start is not read as the
+        // renderer running on into the next track.
+        lastPositionMs = target
         mediaStatus = mediaStatus?.copy(positionMs = target)
         mediaStatusAt = SystemClock.elapsedRealtime()
     }
@@ -215,12 +283,13 @@ internal class DlnaSession(
             val position = call(Dlna.AV_TRANSPORT, renderer.avTransportUrl, "GetPositionInfo", instance())
             val volume = if (pollCount++ % VOLUME_EVERY_POLLS == 0) readVolume() else null
             val state = transport["CurrentTransportState"]?.trim().orEmpty()
+            val trackUri = position["TrackURI"]?.trim()?.takeIf { it.isNotEmpty() && it != "NOT_IMPLEMENTED" }
             val positionMs = Dlna.parseTime(position["RelTime"])
             val durationMs = Dlna.parseTime(position["TrackDuration"])?.takeIf { it > 0 }
             main.post {
                 if (closed) return@post
                 pollFailures = 0
-                onPolled(state, positionMs, durationMs)
+                onPolled(state, positionMs, durationMs, trackUri)
                 volume?.let { (level, mute) -> applyVolume(level, mute) }
             }
         } catch (e: Exception) {
@@ -235,7 +304,18 @@ internal class DlnaSession(
     }
 
     /** Main thread: one poll's answers, as the status a Cast receiver would have sent. */
-    private fun onPolled(state: String, positionMs: Long?, durationMs: Long?) {
+    private fun onPolled(state: String, positionMs: Long?, durationMs: Long?, trackUri: String?) {
+        if (movedOnToNext(state, positionMs, trackUri)) {
+            loadedUrl = nextUrl
+            nextUrl = null
+            nextRequest = null
+            loadedAt = SystemClock.elapsedRealtime()
+            sawPlaying = false
+            stopRequested = false
+            lastDurationMs = null
+        }
+        lastPositionMs = positionMs
+        if (durationMs != null) lastDurationMs = durationMs
         val url = loadedUrl ?: return
         val previous = mediaStatus
         val sinceLoad = SystemClock.elapsedRealtime() - loadedAt
@@ -278,6 +358,22 @@ internal class DlnaSession(
                 playbackRate = 1.0,
             ),
         )
+    }
+
+    /**
+     * Whether the renderer has run on into [nextUrl]. Said outright where it
+     * reports the track's URI; otherwise read from the playhead jumping back to
+     * the start just as the old track was ending.
+     */
+    private fun movedOnToNext(state: String, positionMs: Long?, trackUri: String?): Boolean {
+        val next = nextUrl ?: return false
+        if (trackUri == next) return true
+        if (trackUri == loadedUrl) return false
+        // No URI, or one the renderer has rewritten: go by the playhead.
+        if (!state.equals("PLAYING", ignoreCase = true) && !state.equals("TRANSITIONING", ignoreCase = true)) return false
+        val before = lastPositionMs ?: return false
+        val length = lastDurationMs ?: return false
+        return before >= length - END_WINDOW_MS && (positionMs ?: return false) < START_WINDOW_MS
     }
 
     private fun publish(status: CastProtocol.MediaStatus) {
@@ -393,5 +489,9 @@ internal class DlnaSession(
 
         /** A resume point this close to the start is not worth a seek some renderers fumble. */
         const val MIN_SEEK_MS = 2_000L
+
+        /** A playhead this near the end, then this near the start, is the next track begun. */
+        const val END_WINDOW_MS = 5_000L
+        const val START_WINDOW_MS = 4_000L
     }
 }
