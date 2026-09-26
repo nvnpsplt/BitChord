@@ -33,9 +33,6 @@ jobs:
     - name: Cast and translation unit tests
       run: ./gradlew testDevDebugUnitTest --tests "com.music.bitchord.playback.cast.*" --tests "com.music.bitchord.LocaleStringsTest"
 
-    - name: Compile the FOSS build (no Google Play services)
-      run: ./gradlew compileDevDebugKotlin -Pfoss=true
-
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:

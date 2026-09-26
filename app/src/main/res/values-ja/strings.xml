@@ -1292,7 +1292,6 @@
     <string name="cast_section_title">キャスト</string>
     <string name="cast_searching">Wi-Fi 上のデバイスを検索しています…</string>
     <string name="cast_none_found">キャストデバイスが見つかりません</string>
-    <string name="cast_open_picker">タップしてキャストデバイスの選択を開く</string>
     <string name="cast_connecting">接続しています…</string>
     <string name="cast_casting">キャスト中</string>
     <string name="cast_casting_to">%1$s にキャスト中</string>

@@ -2,12 +2,7 @@ package com.music.bitchord.playback.cast
 
 import androidx.media3.common.Player
 
-/**
- * What the cast controller needs from the playback service. Kept apart from
- * [CastController] because that class only exists in builds with Google Cast
- * (the `gms` source set); FOSS builds compile the service against this and a
- * stub controller that never casts.
- */
+/** What the cast controller needs from the playback service — see [CastController]. */
 internal interface CastHost {
     /** The ExoPlayer that owns the queue right now. */
     val localPlayer: Player?

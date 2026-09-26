@@ -165,10 +165,10 @@
 
   function mediaIdOf(info) {
     if (!info) return null;
-    // The app sends the track's id as contentId; the ExoPlayer-style
-    // customData carries it too, for receivers that rewrite contentId.
-    var cd = info.customData && info.customData.mediaItem;
-    return (cd && cd.mediaId) || info.contentId || null;
+    // The app sends the track's BitChord id in the media's customData; the
+    // contentId is the stream URL.
+    var cd = info.customData || {};
+    return cd.mediaId || (cd.mediaItem && cd.mediaItem.mediaId) || info.contentId || null;
   }
 
   function renderLyrics() {

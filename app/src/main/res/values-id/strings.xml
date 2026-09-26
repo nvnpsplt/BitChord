@@ -1291,7 +1291,6 @@
     <string name="cast_section_title">Transmisikan</string>
     <string name="cast_searching">Mencari perangkat di Wi-Fi Anda…</string>
     <string name="cast_none_found">Tidak ada perangkat transmisi</string>
-    <string name="cast_open_picker">Ketuk untuk membuka pemilih perangkat Cast</string>
     <string name="cast_connecting">Menghubungkan…</string>
     <string name="cast_casting">Mentransmisikan</string>
     <string name="cast_casting_to">Mentransmisikan ke %1$s</string>

@@ -1233,7 +1233,6 @@
     <string name="cast_section_title">Truyền</string>
     <string name="cast_searching">Đang tìm thiết bị trên Wi-Fi của bạn…</string>
     <string name="cast_none_found">Không tìm thấy thiết bị truyền</string>
-    <string name="cast_open_picker">Nhấn để mở trình chọn thiết bị Cast</string>
     <string name="cast_connecting">Đang kết nối…</string>
     <string name="cast_casting">Đang truyền</string>
     <string name="cast_casting_to">Đang truyền tới %1$s</string>

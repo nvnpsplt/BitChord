@@ -1250,7 +1250,6 @@
     <string name="cast_section_title">Trasmetti</string>
     <string name="cast_searching">Ricerca di dispositivi sulla tua rete Wi-Fi…</string>
     <string name="cast_none_found">Nessun dispositivo trovato</string>
-    <string name="cast_open_picker">Tocca per aprire la scelta dei dispositivi Cast</string>
     <string name="cast_connecting">Connessione…</string>
     <string name="cast_casting">Trasmissione in corso</string>
     <string name="cast_casting_to">Trasmissione su %1$s</string>

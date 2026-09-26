@@ -1588,7 +1588,6 @@ class PlaybackService : MediaLibraryService() {
     private fun startCastSupport(playbackDataSourceFactory: DataSource.Factory) {
         if (!CastSupport.isAvailable(this)) return
         castController = runCatching {
-            CastSupport.initialize(this)
             CastController(this, playbackDataSourceFactory, castHost)
         }.onFailure {
             TrackLog.d("BitChordCast", "cast unavailable: ${it.message}")

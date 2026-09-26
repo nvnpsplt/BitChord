@@ -46,102 +46,35 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.util.UnstableApi
-import androidx.mediarouter.media.MediaRouter
 import com.music.bitchord.R
+import com.music.bitchord.playback.cast.CastDevice
+import com.music.bitchord.playback.cast.CastDiscovery
 import com.music.bitchord.playback.cast.CastStatus
 import com.music.bitchord.playback.cast.CastSupport
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import kotlinx.coroutines.delay
 
-/** One cast device the output sheet can offer, snapshotted off its MediaRouter route. */
-internal data class CastDevice(
-    val routeId: String,
-    val name: String,
-    val isTv: Boolean,
-    val connectionState: Int,
-    val isSelected: Boolean,
-)
-
 /**
  * Cast devices on this network, discovered for as long as the caller is on
- * screen — MediaRouter's active scan costs battery and Wi-Fi traffic, so it
+ * screen — browsing the network costs battery and multicast traffic, so it
  * runs while the output sheet is open and not a moment longer.
  */
-@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 internal fun rememberCastDevices(enabled: Boolean): List<CastDevice> {
     val context = LocalContext.current
-    var devices by remember { mutableStateOf(emptyList<CastDevice>()) }
     DisposableEffect(context, enabled) {
-        if (!enabled) {
-            devices = emptyList()
-            return@DisposableEffect onDispose { }
-        }
-        CastSupport.initialize(context)
-        val router = MediaRouter.getInstance(context)
-        val selector = CastSupport.routeSelector
-        var lastLogged: String? = null
-        fun refresh() {
-            val seen = router.routes.joinToString { route ->
-                val categories = route.controlFilters.flatMap { f -> (0 until f.countCategories()).map(f::getCategory) }
-                "${route.name}[default=${route.isDefaultOrBluetooth} enabled=${route.isEnabled} $categories]"
-            }
-            if (seen != lastLogged) {
-                lastLogged = seen
-                com.music.bitchord.data.TrackLog.d("BitChordCast", "routes: $seen")
-            }
-            devices = router.routes
-                .filter(CastSupport::isCastRoute)
-                .map {
-                    CastDevice(
-                        routeId = it.id,
-                        name = it.name,
-                        isTv = it.deviceType == MediaRouter.RouteInfo.DEVICE_TYPE_TV,
-                        connectionState = it.connectionState,
-                        isSelected = it.isSelected,
-                    )
-                }
-                .sortedBy { it.name.lowercase() }
-        }
-        val callback = object : MediaRouter.Callback() {
-            override fun onRouteAdded(router: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
-            override fun onRouteRemoved(router: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
-            override fun onRouteChanged(router: MediaRouter, route: MediaRouter.RouteInfo) = refresh()
-            override fun onRouteSelected(router: MediaRouter, route: MediaRouter.RouteInfo, reason: Int) = refresh()
-            override fun onRouteUnselected(router: MediaRouter, route: MediaRouter.RouteInfo, reason: Int) = refresh()
-        }
-        router.addCallback(
-            selector,
-            callback,
-            MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY or MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN,
-        )
-        refresh()
-        // The Cast framework adds its route provider to this process's
-        // MediaRouter only once it has finished starting, which can land after
-        // the sheet opens; a provider change fires none of the callbacks above.
-        val handler = android.os.Handler(android.os.Looper.getMainLooper())
-        val poll = object : Runnable {
-            override fun run() {
-                refresh()
-                handler.postDelayed(this, ROUTE_POLL_MS)
-            }
-        }
-        handler.postDelayed(poll, ROUTE_POLL_MS)
-        onDispose {
-            handler.removeCallbacks(poll)
-            router.removeCallback(callback)
-        }
+        if (enabled) CastDiscovery.start(context)
+        onDispose { if (enabled) CastDiscovery.stop() }
     }
-    return devices
+    val devices by CastDiscovery.devices.collectAsStateWithLifecycle()
+    return if (enabled) devices else emptyList()
 }
 
 /**
  * The Cast half of the output sheet: the devices on this Wi-Fi, which one is
  * playing, and the way back to the phone.
  */
-@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 internal fun CastDevicesSection(devices: List<CastDevice>) {
     val context = LocalContext.current
@@ -158,44 +91,28 @@ internal fun CastDevicesSection(devices: List<CastDevice>) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (devices.isEmpty()) {
-            // Searching for a while, then an honest answer and a way out: the
-            // standard Cast picker, which also tells a filtering problem here
-            // apart from there being no device to find.
+            // Searching for a while, then an honest answer — the search itself
+            // carries on for as long as the sheet is open.
             var searchedLong by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) {
                 delay(SEARCH_PATIENCE_MS)
                 searchedLong = true
             }
-            val failure = remember(searchedLong) { CastSupport.initFailure(context) }
             CastRow(
                 icon = Icons.Rounded.CastConnected,
                 title = stringResource(if (searchedLong) R.string.cast_none_found else R.string.cast_searching),
-                subtitle = when {
-                    failure != null -> failure
-                    searchedLong -> stringResource(R.string.cast_open_picker)
-                    else -> null
-                },
+                subtitle = null,
                 active = false,
-                searching = !searchedLong,
-                onClick = if (searchedLong) {
-                    {
-                        runCatching {
-                            androidx.mediarouter.app.MediaRouteChooserDialog(context).apply {
-                                routeSelector = CastSupport.routeSelector
-                            }.show()
-                        }
-                    }
-                } else {
-                    null
-                },
+                searching = true,
+                onClick = null,
             )
         }
         devices.forEach { device ->
-            val connecting = device.connectionState == MediaRouter.RouteInfo.CONNECTION_STATE_CONNECTING ||
-                (device.isSelected && cast.phase == CastStatus.Phase.CONNECTING)
-            val playing = device.isSelected && cast.isCasting
+            val selected = cast.deviceId == device.id
+            val connecting = selected && cast.phase == CastStatus.Phase.CONNECTING
+            val playing = selected && cast.isCasting
             CastRow(
-                icon = if (device.isTv) Icons.Rounded.Tv else Icons.Rounded.Speaker,
+                icon = if (device.hasScreen) Icons.Rounded.Tv else Icons.Rounded.Speaker,
                 title = device.name,
                 subtitle = when {
                     connecting -> stringResource(R.string.cast_connecting)
@@ -204,15 +121,7 @@ internal fun CastDevicesSection(devices: List<CastDevice>) {
                 },
                 active = playing,
                 searching = connecting,
-                onClick = if (playing || connecting) {
-                    null
-                } else {
-                    {
-                        MediaRouter.getInstance(context).routes
-                            .firstOrNull { it.id == device.routeId }
-                            ?.select()
-                    }
-                },
+                onClick = if (playing || connecting) null else ({ CastSupport.connect(device) }),
             )
         }
         if (cast.isActive) {
@@ -263,7 +172,6 @@ internal fun CastEffectsNote() {
  * twice a second while shown, because the TV remote and Google Home move it
  * too and neither tells this phone.
  */
-@androidx.annotation.OptIn(UnstableApi::class)
 @Composable
 internal fun CastVolumeRow() {
     val context = LocalContext.current
@@ -383,5 +291,4 @@ private fun CastRow(
 }
 
 private const val CAST_VOLUME_POLL_MS = 500L
-private const val ROUTE_POLL_MS = 1_500L
 private const val SEARCH_PATIENCE_MS = 8_000L
