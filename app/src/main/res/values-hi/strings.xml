@@ -1310,6 +1310,8 @@
     <!-- Google Cast -->
     <string name="cast_section_title">कास्ट</string>
     <string name="cast_searching">आपके Wi-Fi पर डिवाइस खोजे जा रहे हैं…</string>
+    <string name="cast_none_found">कोई कास्ट डिवाइस नहीं मिला</string>
+    <string name="cast_open_picker">कास्ट डिवाइस चुनने के लिए टैप करें</string>
     <string name="cast_connecting">कनेक्ट हो रहा है…</string>
     <string name="cast_casting">कास्ट हो रहा है</string>
     <string name="cast_casting_to">%1$s पर कास्ट हो रहा है</string>

@@ -82,9 +82,18 @@ internal fun rememberCastDevices(enabled: Boolean): List<CastDevice> {
         CastSupport.initialize(context)
         val router = MediaRouter.getInstance(context)
         val selector = CastSupport.routeSelector
+        var lastLogged: String? = null
         fun refresh() {
+            val seen = router.routes.joinToString { route ->
+                val categories = route.controlFilters.flatMap { f -> (0 until f.countCategories()).map(f::getCategory) }
+                "${route.name}[default=${route.isDefaultOrBluetooth} enabled=${route.isEnabled} $categories]"
+            }
+            if (seen != lastLogged) {
+                lastLogged = seen
+                com.music.bitchord.data.TrackLog.d("BitChordCast", "routes: $seen")
+            }
             devices = router.routes
-                .filter { !it.isDefaultOrBluetooth && it.isEnabled && it.matchesSelector(selector) }
+                .filter(CastSupport::isCastRoute)
                 .map {
                     CastDevice(
                         routeId = it.id,
@@ -109,7 +118,21 @@ internal fun rememberCastDevices(enabled: Boolean): List<CastDevice> {
             MediaRouter.CALLBACK_FLAG_REQUEST_DISCOVERY or MediaRouter.CALLBACK_FLAG_PERFORM_ACTIVE_SCAN,
         )
         refresh()
-        onDispose { router.removeCallback(callback) }
+        // The Cast framework adds its route provider to this process's
+        // MediaRouter only once it has finished starting, which can land after
+        // the sheet opens; a provider change fires none of the callbacks above.
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val poll = object : Runnable {
+            override fun run() {
+                refresh()
+                handler.postDelayed(this, ROUTE_POLL_MS)
+            }
+        }
+        handler.postDelayed(poll, ROUTE_POLL_MS)
+        onDispose {
+            handler.removeCallbacks(poll)
+            router.removeCallback(callback)
+        }
     }
     return devices
 }
@@ -135,13 +158,36 @@ internal fun CastDevicesSection(devices: List<CastDevice>) {
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (devices.isEmpty()) {
+            // Searching for a while, then an honest answer and a way out: the
+            // standard Cast picker, which also tells a filtering problem here
+            // apart from there being no device to find.
+            var searchedLong by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) {
+                delay(SEARCH_PATIENCE_MS)
+                searchedLong = true
+            }
+            val failure = remember(searchedLong) { CastSupport.initFailure(context) }
             CastRow(
                 icon = Icons.Rounded.CastConnected,
-                title = stringResource(R.string.cast_searching),
-                subtitle = null,
+                title = stringResource(if (searchedLong) R.string.cast_none_found else R.string.cast_searching),
+                subtitle = when {
+                    failure != null -> failure
+                    searchedLong -> stringResource(R.string.cast_open_picker)
+                    else -> null
+                },
                 active = false,
-                searching = true,
-                onClick = null,
+                searching = !searchedLong,
+                onClick = if (searchedLong) {
+                    {
+                        runCatching {
+                            androidx.mediarouter.app.MediaRouteChooserDialog(context).apply {
+                                routeSelector = CastSupport.routeSelector
+                            }.show()
+                        }
+                    }
+                } else {
+                    null
+                },
             )
         }
         devices.forEach { device ->
@@ -337,3 +383,5 @@ private fun CastRow(
 }
 
 private const val CAST_VOLUME_POLL_MS = 500L
+private const val ROUTE_POLL_MS = 1_500L
+private const val SEARCH_PATIENCE_MS = 8_000L

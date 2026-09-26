@@ -117,6 +117,36 @@ object CastSupport {
         }
     }
 
+    /**
+     * Why the Cast framework could not start on this phone, or null while it
+     * is fine (or still starting). Shown in the output sheet, because an
+     * empty device list otherwise looks identical to "no TV on this Wi-Fi".
+     */
+    fun initFailure(context: Context): String? {
+        if (!isAvailable(context)) return "Google Play services unavailable"
+        return runCatching {
+            Cast.getSingletonInstance(context.applicationContext).castContextLoadFailure
+                ?.let { it.message ?: it.javaClass.simpleName }
+        }.getOrElse { it.message ?: it.javaClass.simpleName }
+    }
+
+    /**
+     * Whether [route] is a Google Cast device. Matched on the Cast control
+     * category family rather than only the exact receiver category: the route
+     * a Cast device publishes carries whichever category the discovery request
+     * that found it asked for, and requests from other apps' sessions or the
+     * system can reach this process's MediaRouter too.
+     */
+    fun isCastRoute(route: androidx.mediarouter.media.MediaRouter.RouteInfo): Boolean {
+        if (route.isDefaultOrBluetooth || !route.isEnabled) return false
+        if (route.matchesSelector(routeSelector)) return true
+        return route.controlFilters.any { filter ->
+            (0 until filter.countCategories()).any { filter.getCategory(it).startsWith(CAST_CATEGORY_PREFIX) }
+        }
+    }
+
+    private const val CAST_CATEGORY_PREFIX = "com.google.android.gms.cast.CATEGORY_CAST"
+
     /** What the output sheet asks MediaRouter to discover: devices that can run our receiver. */
     val routeSelector: MediaRouteSelector by lazy {
         MediaRouteSelector.Builder()

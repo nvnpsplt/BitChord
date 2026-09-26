@@ -1315,6 +1315,8 @@
     <!-- Google Cast -->
     <string name="cast_section_title">העברה</string>
     <string name="cast_searching">מחפש מכשירים ברשת ה-Wi-Fi…</string>
+    <string name="cast_none_found">לא נמצאו מכשירי העברה</string>
+    <string name="cast_open_picker">הקש כדי לפתוח את בחירת מכשירי Cast</string>
     <string name="cast_connecting">מתחבר…</string>
     <string name="cast_casting">מעביר</string>
     <string name="cast_casting_to">מעביר אל %1$s</string>
