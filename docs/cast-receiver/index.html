@@ -1,0 +1,282 @@
+<!doctype html>
+<!--
+  BitChord's Google Cast receiver: the page a Chromecast / Google TV loads when
+  BitChord casts to it. Plays the audio the phone serves, shows the artwork and
+  track, and scrolls synced lyrics sent over the BitChord message channel.
+
+  Hosted as a static page (GitHub Pages works) and registered as a Custom
+  Receiver in the Google Cast SDK Developer Console; the app ID it gets there
+  goes into the app build as CAST_RECEIVER_APP_ID. See README.md beside this.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BitChord</title>
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<style>
+  :root {
+    --fg: #ffffff;
+    --fg-dim: rgba(255, 255, 255, 0.55);
+    --fg-faint: rgba(255, 255, 255, 0.28);
+    --accent: #ffffff;
+    --bg: #0b0b0f;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--fg);
+    font-family: "Google Sans", Roboto, "Noto Sans", "Noto Sans Tamil", "Noto Sans Devanagari",
+      "Noto Sans JP", "Noto Sans SC", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #backdrop {
+    position: fixed; inset: -8%;
+    background-size: cover; background-position: center;
+    filter: blur(70px) saturate(1.4) brightness(0.45);
+    transform: scale(1.1);
+    transition: background-image 1.2s ease;
+  }
+  #shade {
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse at 30% 50%, rgba(0,0,0,0.05), rgba(0,0,0,0.55));
+  }
+  #stage {
+    position: relative; z-index: 1;
+    display: grid; grid-template-columns: 38% 1fr; gap: 6vw;
+    align-items: center; height: 100%; padding: 7vh 6vw;
+  }
+  #stage.no-lyrics { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+  #stage.no-lyrics #lyrics { display: none; }
+  #now { display: flex; flex-direction: column; gap: 3.2vh; min-width: 0; }
+  #stage.no-lyrics #now { align-items: center; max-width: 60vw; }
+  #art {
+    width: 100%; max-width: 46vh; aspect-ratio: 1; border-radius: 1.6vh;
+    background: #1c1c22 center / cover no-repeat;
+    box-shadow: 0 3vh 8vh rgba(0,0,0,0.55);
+  }
+  #title { font-size: 4.6vh; font-weight: 700; line-height: 1.15;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  #artist { font-size: 2.8vh; color: var(--fg-dim); margin-top: 0.8vh;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #album { font-size: 2.1vh; color: var(--fg-faint); margin-top: 0.4vh;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #progress { width: 100%; max-width: 46vh; }
+  #bar { height: 0.55vh; background: rgba(255,255,255,0.18); border-radius: 1vh; overflow: hidden; }
+  #fill { height: 100%; width: 0; background: var(--accent); border-radius: 1vh; }
+  #times { display: flex; justify-content: space-between; font-size: 1.8vh;
+    color: var(--fg-dim); margin-top: 1vh; font-variant-numeric: tabular-nums; }
+  #state { font-size: 1.8vh; color: var(--fg-dim); letter-spacing: 0.08em; text-transform: uppercase; }
+
+  #lyrics {
+    height: 86vh; overflow: hidden; position: relative;
+    -webkit-mask-image: linear-gradient(transparent, #000 18%, #000 70%, transparent);
+    mask-image: linear-gradient(transparent, #000 18%, #000 70%, transparent);
+  }
+  #lines { position: absolute; left: 0; right: 0; top: 0; transition: transform 0.55s cubic-bezier(.2,.7,.2,1); }
+  .line {
+    font-size: 4.4vh; font-weight: 700; line-height: 1.3; padding: 1.5vh 0;
+    color: var(--fg-faint); transition: color 0.35s ease, opacity 0.35s ease, filter 0.35s ease;
+    filter: blur(0.8px);
+  }
+  .line.gap { font-size: 3vh; letter-spacing: 0.3em; }
+  .line.past { color: rgba(255,255,255,0.4); }
+  .line.current { color: var(--fg); filter: none; }
+  .line .w { transition: color 0.12s linear; }
+  .line.current.words { color: rgba(255,255,255,0.45); }
+  .line.current .w.sung { color: var(--fg); }
+  .line.end { text-align: right; }
+  .line.center { text-align: center; }
+  .plain .line { color: var(--fg-dim); filter: none; font-size: 3.6vh; }
+
+  #brand {
+    position: fixed; z-index: 2; right: 4vw; bottom: 4vh;
+    font-size: 2vh; font-weight: 600; letter-spacing: 0.12em; color: var(--fg-dim);
+  }
+  #idle {
+    position: fixed; inset: 0; z-index: 3; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 2vh; background: var(--bg);
+    transition: opacity 0.6s ease;
+  }
+  #idle h1 { font-size: 7vh; font-weight: 700; letter-spacing: 0.02em; }
+  #idle p { font-size: 2.4vh; color: var(--fg-dim); }
+  body.playing #idle { opacity: 0; pointer-events: none; }
+  audio { display: none; }
+</style>
+</head>
+<body>
+<audio id="media"></audio>
+<div id="backdrop"></div>
+<div id="shade"></div>
+
+<main id="stage" class="no-lyrics">
+  <section id="now">
+    <div id="art"></div>
+    <div>
+      <div id="title"></div>
+      <div id="artist"></div>
+      <div id="album"></div>
+    </div>
+    <div id="progress">
+      <div id="bar"><div id="fill"></div></div>
+      <div id="times"><span id="elapsed">0:00</span><span id="state"></span><span id="duration">0:00</span></div>
+    </div>
+  </section>
+  <section id="lyrics"><div id="lines"></div></section>
+</main>
+
+<div id="brand">BITCHORD</div>
+<div id="idle"><h1>BitChord</h1><p>Ready to cast</p></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /** The channel the phone sends lyrics on; must match CastLyrics.NAMESPACE in the app. */
+  var NAMESPACE = 'urn:x-cast:com.music.bitchord';
+
+  var context = cast.framework.CastReceiverContext.getInstance();
+  var player = context.getPlayerManager();
+  player.setMediaElement(document.getElementById('media'));
+
+  var el = function (id) { return document.getElementById(id); };
+  var lyricsByMedia = {};   // mediaId -> { synced, lines }
+  var currentMediaId = null;
+  var rendered = null;      // the lyrics object currently in the DOM
+  var lineNodes = [];
+  var activeIndex = -2;
+
+  function fmt(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    var m = Math.floor(sec / 60), s = Math.floor(sec % 60);
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function showMetadata(info) {
+    var md = (info && info.metadata) || {};
+    el('title').textContent = md.title || '';
+    el('artist').textContent = md.artist || md.subtitle || md.albumArtist || '';
+    el('album').textContent = md.albumName || md.albumTitle || '';
+    var image = md.images && md.images.length ? md.images[0].url : '';
+    var css = image ? 'url("' + image.replace(/"/g, '%22') + '")' : 'none';
+    el('art').style.backgroundImage = css;
+    el('backdrop').style.backgroundImage = css;
+  }
+
+  function mediaIdOf(info) {
+    if (!info) return null;
+    // The app sends the track's id as contentId; the ExoPlayer-style
+    // customData carries it too, for receivers that rewrite contentId.
+    var cd = info.customData && info.customData.mediaItem;
+    return (cd && cd.mediaId) || info.contentId || null;
+  }
+
+  function renderLyrics() {
+    var lyrics = currentMediaId ? lyricsByMedia[currentMediaId] : null;
+    if (lyrics === rendered) return;
+    rendered = lyrics;
+    activeIndex = -2;
+    var box = el('lines');
+    box.innerHTML = '';
+    box.style.transform = 'translateY(0)';
+    lineNodes = [];
+    var hasLines = lyrics && lyrics.lines && lyrics.lines.length;
+    el('stage').classList.toggle('no-lyrics', !hasLines);
+    el('lyrics').classList.toggle('plain', !!(hasLines && !lyrics.synced));
+    if (!hasLines) return;
+    lyrics.lines.forEach(function (line) {
+      var node = document.createElement('div');
+      node.className = 'line' + (line.text ? '' : ' gap') +
+        (line.align === 'end' ? ' end' : line.align === 'center' ? ' center' : '');
+      if (line.words && line.words.length) {
+        node.classList.add('words');
+        line.words.forEach(function (w, i) {
+          if (i > 0) node.appendChild(document.createTextNode(' '));
+          var span = document.createElement('span');
+          span.className = 'w';
+          span.textContent = w.text;
+          node.appendChild(span);
+        });
+      } else {
+        node.textContent = line.text || '• • •';
+      }
+      box.appendChild(node);
+      lineNodes.push(node);
+    });
+  }
+
+  function tick() {
+    var t = player.getCurrentTimeSec();
+    var d = player.getDurationSec();
+    el('elapsed').textContent = fmt(t);
+    el('duration').textContent = fmt(d);
+    el('fill').style.width = (d > 0 ? Math.min(100, (t / d) * 100) : 0) + '%';
+
+    var lyrics = rendered;
+    if (!lyrics || !lyrics.synced || !lineNodes.length) return;
+    var ms = t * 1000;
+    var lines = lyrics.lines;
+    var index = -1;
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].t <= ms) index = i; else break;
+    }
+    if (index !== activeIndex) {
+      activeIndex = index;
+      lineNodes.forEach(function (node, i) {
+        node.classList.toggle('current', i === index);
+        node.classList.toggle('past', i < index);
+      });
+      var target = lineNodes[Math.max(index, 0)];
+      var offset = target.offsetTop - el('lyrics').clientHeight * 0.36;
+      el('lines').style.transform = 'translateY(' + (-Math.max(0, offset)) + 'px)';
+    }
+    var current = lines[index];
+    if (current && current.words && current.words.length) {
+      var spans = lineNodes[index].querySelectorAll('.w');
+      for (var w = 0; w < current.words.length; w++) {
+        spans[w].classList.toggle('sung', current.words[w].s <= ms);
+      }
+    }
+  }
+
+  function onMediaChanged() {
+    var info = player.getMediaInformation();
+    currentMediaId = mediaIdOf(info);
+    showMetadata(info);
+    renderLyrics();
+  }
+
+  player.addEventListener(cast.framework.events.EventType.PLAYER_LOAD_COMPLETE, onMediaChanged);
+  player.addEventListener(cast.framework.events.EventType.MEDIA_STATUS, function () {
+    var info = player.getMediaInformation();
+    if (mediaIdOf(info) !== currentMediaId) onMediaChanged();
+    var state = player.getPlayerState();
+    var S = cast.framework.messages.PlayerState;
+    document.body.classList.toggle('playing', state === S.PLAYING || state === S.PAUSED || state === S.BUFFERING);
+    el('state').textContent = state === S.PAUSED ? 'Paused' : state === S.BUFFERING ? 'Loading' : '';
+  });
+
+  context.addCustomMessageListener(NAMESPACE, function (event) {
+    var msg = event.data || {};
+    if (typeof msg === 'string') { try { msg = JSON.parse(msg); } catch (e) { return; } }
+    if (msg.type !== 'lyrics' || !msg.mediaId) return;
+    lyricsByMedia[msg.mediaId] = msg.lines && msg.lines.length ? { synced: !!msg.synced, lines: msg.lines } : null;
+    // Keep only a handful: a long session sends lyrics for every track.
+    var ids = Object.keys(lyricsByMedia);
+    if (ids.length > 8) delete lyricsByMedia[ids[0]];
+    if (msg.mediaId === currentMediaId) { rendered = undefined; renderLyrics(); }
+  });
+
+  setInterval(tick, 100);
+
+  var options = new cast.framework.CastReceiverOptions();
+  options.customNamespaces = {};
+  options.customNamespaces[NAMESPACE] = cast.framework.system.MessageType.JSON;
+  // Music plays for hours with nobody touching the remote.
+  options.disableIdleTimeout = true;
+  options.skipPlayersLoad = true;
+  context.start(options);
+})();
+</script>
+</body>
+</html>

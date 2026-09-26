@@ -6428,6 +6428,9 @@ class PlaybackService : MediaLibraryService() {
             }
             withContext(Dispatchers.Main) {
                 serviceLyrics = lines
+                // Kept by the cast controller even while not casting, so a
+                // session started mid-song has this track's lyrics to show.
+                castController?.sendLyrics(currentSong.videoId, lines)
                 if (player?.isPlaying == true) {
                     updateLyricSubtitle()
                 }
