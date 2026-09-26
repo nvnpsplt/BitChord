@@ -1,0 +1,63 @@
+name: Sync with upstream BitChord
+
+# Keeps this fork current with kushagrasinghx/BitChord: once a week (or on
+# demand from the Actions tab) it merges upstream `main` into a `sync/upstream`
+# branch and opens a pull request here when there is anything new. Merge
+# conflicts are left for a person: the job stops and says so.
+#
+# Needs, once, in this repository's settings: Actions → General → Workflow
+# permissions → "Read and write permissions" and "Allow GitHub Actions to
+# create and approve pull requests".
+
+on:
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    # Only in forks; never in the upstream repository itself.
+    if: github.repository != 'kushagrasinghx/BitChord'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge upstream main
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/kushagrasinghx/BitChord.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "Already up to date with upstream."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git checkout -B sync/upstream
+          if ! git merge --no-edit upstream/main; then
+            echo "::error::Upstream changes conflict with this fork. Merge upstream/main by hand."
+            exit 1
+          fi
+          git push --force-with-lease origin sync/upstream
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh pr list --head sync/upstream --state open --json number --jq 'length' | grep -q '^0$'; then
+            gh pr create --base main --head sync/upstream \
+              --title "Sync with upstream BitChord" \
+              --body "Merges the latest \`main\` from kushagrasinghx/BitChord into this fork. Opened automatically by the sync-upstream workflow."
+          else
+            echo "A sync pull request is already open; its branch was updated."
+          fi
