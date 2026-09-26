@@ -1308,6 +1308,21 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Caster</string>
+    <string name="cast_searching">Recherche d\'appareils sur votre Wi-Fi…</string>
+    <string name="cast_connecting">Connexion…</string>
+    <string name="cast_casting">Cast en cours</string>
+    <string name="cast_casting_to">Cast sur %1$s</string>
+    <string name="cast_stop">Arrêter le cast</string>
+    <string name="cast_local_effects_note">L\'égaliseur, le fondu enchaîné, Automix et l\'audio spatial fonctionnent sur ce téléphone et sont donc suspendus pendant le cast.</string>
+    <string name="cast_blocked_party">Le cast n\'est pas disponible pendant Listen Together</string>
+    <string name="cast_track_skipped">Titre ignoré : l\'appareil n\'a pas pu le lire</string>
+    <string name="cast_connect_failed">Impossible de lancer le cast. Vérifiez que le téléphone et l\'appareil sont sur le même Wi-Fi.</string>
+    <string name="cast_feature_unavailable">Indisponible pendant le cast</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Afficher les appareils Chromecast et Google Cast dans le choix de sortie</string>
+    <string name="cast_continue_title">Continuer après le cast</string>
+    <string name="cast_continue_subtitle">À la fin d\'une session de cast, continuer la lecture sur ce téléphone</string>
 
 </resources>

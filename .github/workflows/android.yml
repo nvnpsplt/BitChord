@@ -29,6 +29,9 @@ jobs:
     - name: Build Dev Debug APK
       run: ./gradlew assembleDevDebug
 
+    - name: Cast and translation unit tests
+      run: ./gradlew testDevDebugUnitTest --tests "com.music.bitchord.playback.cast.*" --tests "com.music.bitchord.LocaleStringsTest"
+
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:

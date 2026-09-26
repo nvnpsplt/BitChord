@@ -1246,6 +1246,21 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Trasmetti</string>
+    <string name="cast_searching">Ricerca di dispositivi sulla tua rete Wi-Fi…</string>
+    <string name="cast_connecting">Connessione…</string>
+    <string name="cast_casting">Trasmissione in corso</string>
+    <string name="cast_casting_to">Trasmissione su %1$s</string>
+    <string name="cast_stop">Interrompi trasmissione</string>
+    <string name="cast_local_effects_note">Equalizzatore, dissolvenza incrociata, Automix e audio spaziale funzionano su questo telefono, quindi si fermano durante la trasmissione.</string>
+    <string name="cast_blocked_party">La trasmissione non è disponibile durante Listen Together</string>
+    <string name="cast_track_skipped">Saltato un brano che il dispositivo non è riuscito a riprodurre</string>
+    <string name="cast_connect_failed">Impossibile avviare la trasmissione. Verifica che telefono e dispositivo siano sulla stessa rete Wi-Fi.</string>
+    <string name="cast_feature_unavailable">Non disponibile durante la trasmissione</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Mostra i dispositivi Chromecast e Google Cast nella scelta dell\'uscita</string>
+    <string name="cast_continue_title">Continua dopo la trasmissione</string>
+    <string name="cast_continue_subtitle">Al termine di una sessione di trasmissione, continua a riprodurre da questo telefono</string>
 
 </resources>

@@ -1288,6 +1288,21 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">キャスト</string>
+    <string name="cast_searching">Wi-Fi 上のデバイスを検索しています…</string>
+    <string name="cast_connecting">接続しています…</string>
+    <string name="cast_casting">キャスト中</string>
+    <string name="cast_casting_to">%1$s にキャスト中</string>
+    <string name="cast_stop">キャストを停止</string>
+    <string name="cast_local_effects_note">イコライザー、クロスフェード、Automix、空間オーディオはこのスマートフォン上で動作するため、キャスト中は一時停止します。</string>
+    <string name="cast_blocked_party">Listen Together 中はキャストできません</string>
+    <string name="cast_track_skipped">キャストデバイスで再生できない曲をスキップしました</string>
+    <string name="cast_connect_failed">キャストを開始できませんでした。スマートフォンとデバイスが同じ Wi-Fi に接続されているか確認してください。</string>
+    <string name="cast_feature_unavailable">キャスト中は利用できません</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">出力の選択に Chromecast と Google Cast デバイスを表示</string>
+    <string name="cast_continue_title">キャスト終了後も再生を続ける</string>
+    <string name="cast_continue_subtitle">キャストセッションが終了したら、このスマートフォンで再生を続けます</string>
 
 </resources>
