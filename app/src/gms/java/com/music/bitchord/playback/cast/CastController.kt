@@ -28,29 +28,8 @@ import com.music.bitchord.data.settings.AppSettings
 internal class CastController(
     context: Context,
     dataSourceFactory: DataSource.Factory,
-    private val host: Host,
+    private val host: CastHost,
 ) {
-
-    interface Host {
-        /** The ExoPlayer that owns the queue right now. */
-        val localPlayer: Player?
-
-        /** Points the media session at [player]. */
-        fun useSessionPlayer(player: Player)
-
-        /** Why casting cannot start right now, as a string resource, or null when it can. */
-        fun castBlockedReason(): Int?
-
-        /** Casting started; the local player is silent from here on. */
-        fun onCastStarted()
-
-        /** Casting ended and the local player owns playback again. */
-        fun onCastEnded()
-
-        fun onRemoteIsPlayingChanged(isPlaying: Boolean)
-        fun onRemoteAdvance(advance: () -> Unit)
-        fun onRemoteQueueEnded()
-    }
 
     private val appContext = context.applicationContext
     private val cast = Cast.getSingletonInstance(appContext)
