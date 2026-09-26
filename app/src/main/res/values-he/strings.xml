@@ -1332,5 +1332,7 @@
     <string name="cast_continue_subtitle">כשהעברה מסתיימת, להמשיך לנגן מהטלפון הזה</string>
     <string name="cast_captions_title">מילים בטלוויזיה (ניסיוני)</string>
     <string name="cast_captions_subtitle">הצגת מילים מסונכרנות ככתוביות במקלט של Google</string>
+    <string name="cast_dlna_title">מכשירי DLNA (ניסיוני)</string>
+    <string name="cast_dlna_subtitle">הצגת גם טלוויזיות ורמקולים של DLNA/UPnP. חלקם לא מנגנים כל שיר</string>
 
 </resources>

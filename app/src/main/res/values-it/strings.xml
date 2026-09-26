@@ -1266,5 +1266,7 @@
     <string name="cast_continue_subtitle">Al termine di una sessione di trasmissione, continua a riprodurre da questo telefono</string>
     <string name="cast_captions_title">Testi sulla TV (sperimentale)</string>
     <string name="cast_captions_subtitle">Mostra i testi sincronizzati come sottotitoli sul ricevitore di Google</string>
+    <string name="cast_dlna_title">Dispositivi DLNA (sperimentale)</string>
+    <string name="cast_dlna_subtitle">Mostra anche TV e altoparlanti DLNA/UPnP. Alcuni non riproducono tutti i brani</string>
 
 </resources>

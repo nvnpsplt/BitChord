@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Brightness4
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ClosedCaption
+import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.DeleteSweep
@@ -197,6 +198,7 @@ fun SettingsScreen(
     val castSupported = remember(context) { com.music.bitchord.playback.cast.CastSupport.isAvailable(context) }
     val castContinueOnPhone by AppSettings.castContinueOnPhone.collectAsStateWithLifecycle()
     val castLyricsCaptions by AppSettings.castLyricsCaptions.collectAsStateWithLifecycle()
+    val castDlna by AppSettings.castDlna.collectAsStateWithLifecycle()
     val dolbyAtmos by AppSettings.dolbyAtmos.collectAsStateWithLifecycle()
     // A property of the hardware, so it is read once rather than remembered
     // against a key that can never change — see [DeviceCodecs.playsDolbyAtmos],
@@ -727,6 +729,25 @@ fun SettingsScreen(
                             )
                         },
                         onClick = { AppSettings.setCastContinueOnPhone(!castContinueOnPhone) },
+                    )
+                }
+                val castDlnaTitle = stringResource(R.string.cast_dlna_title)
+                row(castDlnaTitle, "cast", "dlna", "upnp", "tv", "speaker", "renderer") {
+                    SettingsRow(
+                        icon = Icons.Rounded.Tv,
+                        title = castDlnaTitle,
+                        subtitle = stringResource(R.string.cast_dlna_subtitle),
+                        trailing = {
+                            Switch(
+                                checked = castDlna,
+                                onCheckedChange = AppSettings::setCastDlna,
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                    checkedBorderColor = MaterialTheme.colorScheme.primary,
+                                ),
+                            )
+                        },
+                        onClick = { AppSettings.setCastDlna(!castDlna) },
                     )
                 }
                 // BitChord's own receiver shows lyrics itself; this is for Google's.

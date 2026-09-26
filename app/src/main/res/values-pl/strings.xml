@@ -1365,5 +1365,7 @@
     <string name="cast_continue_subtitle">Po zakończeniu przesyłania kontynuuj odtwarzanie na tym telefonie</string>
     <string name="cast_captions_title">Tekst na telewizorze (eksperymentalne)</string>
     <string name="cast_captions_subtitle">Pokazuj zsynchronizowany tekst jako napisy w odbiorniku Google</string>
+    <string name="cast_dlna_title">Urządzenia DLNA (eksperymentalne)</string>
+    <string name="cast_dlna_subtitle">Pokazuj też telewizory i głośniki DLNA/UPnP. Niektóre nie odtworzą każdego utworu</string>
 
 </resources>

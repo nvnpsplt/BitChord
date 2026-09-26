@@ -1307,5 +1307,7 @@
     <string name="cast_continue_subtitle">Saat sesi transmisi berakhir, lanjutkan pemutaran dari ponsel ini</string>
     <string name="cast_captions_title">Lirik di TV (eksperimental)</string>
     <string name="cast_captions_subtitle">Tampilkan lirik tersinkron sebagai subtitel di penerima Google</string>
+    <string name="cast_dlna_title">Perangkat DLNA (eksperimental)</string>
+    <string name="cast_dlna_subtitle">Tampilkan juga TV dan speaker DLNA/UPnP. Beberapa tidak dapat memutar semua lagu</string>
 
 </resources>

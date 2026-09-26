@@ -30,7 +30,7 @@ internal class CastController(
 
     private val appContext = context.applicationContext
     private val server = CastMediaServer(appContext, dataSourceFactory)
-    private var session: CastSession? = null
+    private var session: RemoteSession? = null
     private var device: CastDevice? = null
     private var hostAddress: String? = null
 
@@ -108,7 +108,12 @@ internal class CastController(
         }
         device = target
         CastStatus.publish(CastStatus.Snapshot(CastStatus.Phase.CONNECTING, target.name, target.id))
-        val newSession = CastSession(target.host, target.port, CastSupport.RECEIVER_APP_ID, SessionEvents())
+        val renderer = target.dlna
+        val newSession: RemoteSession = if (renderer != null) {
+            DlnaSession(renderer, SessionEvents())
+        } else {
+            CastSession(target.host, target.port, CastSupport.RECEIVER_APP_ID, SessionEvents())
+        }
         session = newSession
         newSession.open()
     }
@@ -158,7 +163,7 @@ internal class CastController(
         session?.sendCustom(CastLyrics.NAMESPACE, message)
     }
 
-    private inner class SessionEvents : CastSession.Listener {
+    private inner class SessionEvents : RemoteSession.Listener {
         private fun isCurrent(): Boolean = session != null
 
         override fun onReady() {

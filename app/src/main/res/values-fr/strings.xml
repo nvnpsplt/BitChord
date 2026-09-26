@@ -1328,5 +1328,7 @@
     <string name="cast_continue_subtitle">À la fin d\'une session de cast, continuer la lecture sur ce téléphone</string>
     <string name="cast_captions_title">Paroles sur la TV (expérimental)</string>
     <string name="cast_captions_subtitle">Afficher les paroles synchronisées en sous-titres sur le récepteur de Google</string>
+    <string name="cast_dlna_title">Appareils DLNA (expérimental)</string>
+    <string name="cast_dlna_subtitle">Afficher aussi les TV et enceintes DLNA/UPnP. Certains ne lisent pas tous les titres</string>
 
 </resources>

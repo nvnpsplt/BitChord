@@ -1327,5 +1327,7 @@
     <string name="cast_continue_subtitle">Nach dem Ende einer Cast-Sitzung auf diesem Handy weiterspielen</string>
     <string name="cast_captions_title">Songtexte auf dem TV (experimentell)</string>
     <string name="cast_captions_subtitle">Synchronisierte Songtexte als Untertitel auf Googles Receiver anzeigen</string>
+    <string name="cast_dlna_title">DLNA-Geräte (experimentell)</string>
+    <string name="cast_dlna_subtitle">Auch DLNA-/UPnP-Fernseher und -Lautsprecher anzeigen. Manche können nicht jeden Titel abspielen</string>
 
 </resources>

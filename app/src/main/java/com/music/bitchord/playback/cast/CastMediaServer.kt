@@ -321,6 +321,10 @@ internal class CastMediaServer(
             val headers = linkedMapOf(
                 "Content-Type" to mimeType,
                 "Accept-Ranges" to "bytes",
+                // What DLNA renderers look for before they will seek or stream;
+                // Cast receivers ignore them.
+                "transferMode.dlna.org" to "Streaming",
+                "contentFeatures.dlna.org" to Dlna.CONTENT_FEATURES,
             )
             if (bodyLength != null) headers["Content-Length"] = bodyLength.toString()
             val partial = range != null

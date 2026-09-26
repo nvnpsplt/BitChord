@@ -1308,5 +1308,7 @@
     <string name="cast_continue_subtitle">キャストセッションが終了したら、このスマートフォンで再生を続けます</string>
     <string name="cast_captions_title">テレビに歌詞を表示（試験運用）</string>
     <string name="cast_captions_subtitle">同期歌詞を Google のレシーバーに字幕として表示します</string>
+    <string name="cast_dlna_title">DLNA デバイス（試験運用）</string>
+    <string name="cast_dlna_subtitle">DLNA / UPnP 対応のテレビやスピーカーも表示します。一部の曲は再生できない場合があります</string>
 
 </resources>

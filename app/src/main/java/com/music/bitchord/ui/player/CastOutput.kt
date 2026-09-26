@@ -123,6 +123,7 @@ internal fun CastDevicesSection(devices: List<CastDevice>) {
                     connecting -> stringResource(R.string.cast_connecting)
                     playing -> stringResource(R.string.cast_casting)
                     device.isGroup -> stringResource(R.string.cast_speaker_group)
+                    device.dlna != null -> "DLNA"
                     else -> null
                 },
                 active = playing,

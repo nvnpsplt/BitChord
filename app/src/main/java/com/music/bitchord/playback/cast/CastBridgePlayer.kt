@@ -41,7 +41,7 @@ import kotlin.math.roundToInt
  * lock-screen lyric line are all written against it and its callbacks — and is
  * held silent in `STATE_IDLE`, where it resolves nothing, holds no audio focus
  * and renders nothing. The receiver is handed one track at a time over a
- * [CastSession], and everything that edits the queue edits the local player
+ * [RemoteSession], and everything that edits the queue edits the local player
  * exactly as it always has; this reconciles the receiver to it afterwards.
  *
  * ## Who owns what
@@ -90,7 +90,7 @@ internal class CastBridgePlayer(
     /** Whether this is bridging to a receiver right now. */
     val active: Boolean get() = session != null
 
-    private var session: CastSession? = null
+    private var session: RemoteSession? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var scope = newScope()
     private var syncJob: Job? = null
@@ -185,7 +185,7 @@ internal class CastBridgePlayer(
      * points the session state at the receiver and hands the receiver the
      * current track, from where the local player had got to.
      */
-    fun activate(local: Player, session: CastSession) {
+    fun activate(local: Player, session: RemoteSession) {
         if (active) return
         if (local !== player) setPlayer(local)
         scope = newScope()
@@ -316,7 +316,9 @@ internal class CastBridgePlayer(
                     mirrorRemoteTransport(status.playerState)
                     // Playing the current track: make sure the next one waits behind it.
                     val desired = desiredNextUrl()
-                    if (queuedNextUrl != desired && desired != unqueueableUrl) requestSync()
+                    if (session?.supportsQueue == true && queuedNextUrl != desired && desired != unqueueableUrl) {
+                        requestSync()
+                    }
                 }
             }
         }
@@ -538,7 +540,8 @@ internal class CastBridgePlayer(
             seekedSinceSync = false
             invalidateState()
             val queueNext = if (local.repeatMode == Player.REPEAT_MODE_ONE) null else next
-            reconcileQueue(cast, queueNext, address)
+            // A DLNA renderer plays one track at a time; the next is loaded when its turn comes.
+            if (cast.supportsQueue) reconcileQueue(cast, queueNext, address)
             return
         }
 
@@ -627,7 +630,7 @@ internal class CastBridgePlayer(
      * Keeps exactly the local queue's next track queued behind the current one
      * on the receiver, so the receiver preloads it and plays straight on.
      */
-    private suspend fun reconcileQueue(cast: CastSession, next: MediaItem?, address: String) {
+    private suspend fun reconcileQueue(cast: RemoteSession, next: MediaItem?, address: String) {
         val nextSource = next?.localConfiguration?.uri
         val nextUrl = nextSource?.let { server.audioUrl(address, it) }
         if (nextUrl == queuedNextUrl) return
@@ -757,6 +760,7 @@ internal class CastBridgePlayer(
      */
     private fun captionsUrl(address: String, item: MediaItem): String? {
         if (CastSupport.hasCustomReceiver || !AppSettings.castLyricsCaptions.value) return null
+        if (session?.supportsCustomMessages != true) return null
         return server.captionsUrl(address, item)
     }
 

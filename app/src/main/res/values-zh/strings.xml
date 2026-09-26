@@ -1307,5 +1307,7 @@
     <string name="cast_continue_subtitle">投放会话结束时，在这部手机上继续播放</string>
     <string name="cast_captions_title">在电视上显示歌词（实验性）</string>
     <string name="cast_captions_subtitle">在 Google 接收器上以字幕形式显示同步歌词</string>
+    <string name="cast_dlna_title">DLNA 设备（实验性）</string>
+    <string name="cast_dlna_subtitle">同时列出 DLNA / UPnP 电视和音箱。部分设备无法播放所有曲目</string>
 
 </resources>
