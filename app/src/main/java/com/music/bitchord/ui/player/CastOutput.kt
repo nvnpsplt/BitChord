@@ -22,6 +22,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Speaker
+import androidx.compose.material.icons.rounded.SpeakerGroup
 import androidx.compose.material.icons.rounded.Tv
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -112,11 +113,16 @@ internal fun CastDevicesSection(devices: List<CastDevice>) {
             val connecting = selected && cast.phase == CastStatus.Phase.CONNECTING
             val playing = selected && cast.isCasting
             CastRow(
-                icon = if (device.hasScreen) Icons.Rounded.Tv else Icons.Rounded.Speaker,
+                icon = when {
+                    device.isGroup -> Icons.Rounded.SpeakerGroup
+                    device.hasScreen -> Icons.Rounded.Tv
+                    else -> Icons.Rounded.Speaker
+                },
                 title = device.name,
                 subtitle = when {
                     connecting -> stringResource(R.string.cast_connecting)
                     playing -> stringResource(R.string.cast_casting)
+                    device.isGroup -> stringResource(R.string.cast_speaker_group)
                     else -> null
                 },
                 active = playing,

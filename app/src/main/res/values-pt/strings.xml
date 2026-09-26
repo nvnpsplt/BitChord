@@ -1316,6 +1316,7 @@
     <string name="cast_section_title">Transmitir</string>
     <string name="cast_searching">Procurando dispositivos no seu Wi-Fi…</string>
     <string name="cast_none_found">Nenhum dispositivo encontrado</string>
+    <string name="cast_speaker_group">Grupo de alto-falantes</string>
     <string name="cast_connecting">Conectando…</string>
     <string name="cast_casting">Transmitindo</string>
     <string name="cast_casting_to">Transmitindo para %1$s</string>

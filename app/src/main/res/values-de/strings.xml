@@ -1311,6 +1311,7 @@
     <string name="cast_section_title">Streamen</string>
     <string name="cast_searching">Suche nach Geräten im WLAN…</string>
     <string name="cast_none_found">Keine Cast-Geräte gefunden</string>
+    <string name="cast_speaker_group">Lautsprechergruppe</string>
     <string name="cast_connecting">Verbinde…</string>
     <string name="cast_casting">Wird gestreamt</string>
     <string name="cast_casting_to">Wird auf %1$s gestreamt</string>

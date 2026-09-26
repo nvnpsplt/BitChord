@@ -1266,6 +1266,7 @@
     <string name="cast_section_title">Yayınla</string>
     <string name="cast_searching">Wi-Fi ağınızda cihaz aranıyor…</string>
     <string name="cast_none_found">Yayın cihazı bulunamadı</string>
+    <string name="cast_speaker_group">Hoparlör grubu</string>
     <string name="cast_connecting">Bağlanıyor…</string>
     <string name="cast_casting">Yayınlanıyor</string>
     <string name="cast_casting_to">%1$s cihazına yayınlanıyor</string>

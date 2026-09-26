@@ -240,35 +240,83 @@ internal object CastProtocol {
         put("sessionId", sessionId)
         put("autoplay", request.autoplay)
         put("currentTime", request.startPositionMs / 1000.0)
+        put("media", media(request))
+    }.toString()
+
+    /**
+     * Appends [request] to the receiver's queue, preloaded [preloadSeconds]
+     * before the current track ends so the receiver runs straight into it.
+     */
+    fun queueInsert(requestId: Int, mediaSessionId: Int, request: LoadRequest, preloadSeconds: Int): String =
+        buildJsonObject {
+            put("type", "QUEUE_INSERT")
+            put("requestId", requestId)
+            put("mediaSessionId", mediaSessionId)
+            put(
+                "items",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("media", media(request))
+                            put("autoplay", true)
+                            put("startTime", 0)
+                            put("preloadTime", preloadSeconds)
+                        },
+                    )
+                },
+            )
+        }.toString()
+
+    fun queueRemove(requestId: Int, mediaSessionId: Int, itemIds: List<Int>): String = buildJsonObject {
+        put("type", "QUEUE_REMOVE")
+        put("requestId", requestId)
+        put("mediaSessionId", mediaSessionId)
+        put("itemIds", buildJsonArray { itemIds.forEach { add(JsonPrimitive(it)) } })
+    }.toString()
+
+    fun queueGetItemIds(requestId: Int, mediaSessionId: Int): String = buildJsonObject {
+        put("type", "QUEUE_GET_ITEM_IDS")
+        put("requestId", requestId)
+        put("mediaSessionId", mediaSessionId)
+    }.toString()
+
+    /** The item ids of a QUEUE_ITEM_IDS reply, in queue order. */
+    fun parseItemIds(payload: JsonObject): List<Int> =
+        (payload["itemIds"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.intOrNull }.orEmpty()
+
+    /** Moves the receiver [jump] items along its queue — a skip to an already preloaded track. */
+    fun queueJump(requestId: Int, mediaSessionId: Int, jump: Int): String = buildJsonObject {
+        put("type", "QUEUE_UPDATE")
+        put("requestId", requestId)
+        put("mediaSessionId", mediaSessionId)
+        put("jump", jump)
+    }.toString()
+
+    private fun media(request: LoadRequest): JsonObject = buildJsonObject {
+        // The URL doubles as the content id: it is unique per source, so a
+        // status report says unambiguously which track is loaded.
+        put("contentId", request.url)
+        put("contentUrl", request.url)
+        put("contentType", request.contentType)
+        put("streamType", "BUFFERED")
         put(
-            "media",
+            "metadata",
             buildJsonObject {
-                // The URL doubles as the content id: it is unique per source, so a
-                // status report says unambiguously which track is loaded.
-                put("contentId", request.url)
-                put("contentUrl", request.url)
-                put("contentType", request.contentType)
-                put("streamType", "BUFFERED")
-                put(
-                    "metadata",
-                    buildJsonObject {
-                        put("type", 0)
-                        put("metadataType", 3) // MUSIC_TRACK
-                        request.title?.let { put("title", it) }
-                        request.artist?.let {
-                            put("artist", it)
-                            put("subtitle", it)
-                        }
-                        request.album?.let { put("albumName", it) }
-                        request.artworkUrl?.let { url ->
-                            put("images", buildJsonArray { add(buildJsonObject { put("url", url) }) })
-                        }
-                    },
-                )
-                put("customData", buildJsonObject { put("mediaId", request.mediaId) })
+                put("type", 0)
+                put("metadataType", 3) // MUSIC_TRACK
+                request.title?.let { put("title", it) }
+                request.artist?.let {
+                    put("artist", it)
+                    put("subtitle", it)
+                }
+                request.album?.let { put("albumName", it) }
+                request.artworkUrl?.let { url ->
+                    put("images", buildJsonArray { add(buildJsonObject { put("url", url) }) })
+                }
             },
         )
-    }.toString()
+        put("customData", buildJsonObject { put("mediaId", request.mediaId) })
+    }
 
     /** PLAY, PAUSE and STOP — the media commands that carry nothing but the session. */
     fun mediaCommand(type: String, requestId: Int, mediaSessionId: Int): String = buildJsonObject {
@@ -334,6 +382,9 @@ internal object CastProtocol {
         val contentId: String?,
         val durationMs: Long?,
         val playbackRate: Double,
+        /** The queue item playing, and every item in the receiver's queue, in order. */
+        val currentItemId: Int? = null,
+        val itemIds: List<Int> = emptyList(),
     )
 
     /**
@@ -344,8 +395,15 @@ internal object CastProtocol {
     fun parseMediaStatus(payload: JsonObject, previous: MediaStatus?): MediaStatus? {
         val entry = (payload["status"] as? JsonArray)?.firstOrNull()?.jsonObjectOrNull() ?: return null
         val sessionId = entry["mediaSessionId"]?.jsonPrimitiveOrNull()?.intOrNull ?: return null
-        val sameSession = previous?.mediaSessionId == sessionId
+        val currentItemId = entry["currentItemId"]?.jsonPrimitiveOrNull()?.intOrNull
+        // "Same" means the same track, not merely the same session: a queue
+        // runs several tracks through one media session.
+        val sameSession = previous?.mediaSessionId == sessionId &&
+            (currentItemId == null || previous?.currentItemId == null || previous.currentItemId == currentItemId)
         val media = entry["media"]?.jsonObjectOrNull()
+        val items = (entry["items"] as? JsonArray)?.mapNotNull {
+            (it as? JsonObject)?.get("itemId")?.jsonPrimitiveOrNull()?.intOrNull
+        }
         val state = when (entry.string("playerState")) {
             "PLAYING" -> PlayerState.PLAYING
             "PAUSED" -> PlayerState.PAUSED
@@ -362,6 +420,8 @@ internal object CastProtocol {
             durationMs = durationSec?.takeIf { it > 0 }?.let { (it * 1000).toLong() }
                 ?: previous?.durationMs?.takeIf { sameSession },
             playbackRate = entry["playbackRate"]?.jsonPrimitiveOrNull()?.doubleOrNull ?: 1.0,
+            currentItemId = currentItemId ?: previous?.let { p -> p.currentItemId.takeIf { p.mediaSessionId == sessionId } },
+            itemIds = items ?: previous?.let { p -> p.itemIds.takeIf { p.mediaSessionId == sessionId } }.orEmpty(),
         )
     }
 

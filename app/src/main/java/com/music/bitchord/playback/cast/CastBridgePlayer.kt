@@ -101,6 +101,16 @@ internal class CastBridgePlayer(
     /** The URL just handed to the receiver, until the receiver reports on it. */
     private var pendingLoadUrl: String? = null
 
+    /**
+     * The track queued on the receiver after the current one, preloaded so it
+     * starts without a gap — see [reconcileQueue].
+     */
+    private var queuedNextUrl: String? = null
+    private var queuedNextMediaId: String? = null
+
+    /** A next track that could not be queued (nothing playable resolved); not retried on every status. */
+    private var unqueueableUrl: String? = null
+
     /** Set while this class moves the local player itself, so it does not echo the move back. */
     private var applyingOwnChange = 0
 
@@ -181,6 +191,9 @@ internal class CastBridgePlayer(
         this.session = session
         loading = false
         pendingLoadUrl = null
+        queuedNextUrl = null
+        queuedNextMediaId = null
+        unqueueableUrl = null
         seekedSinceSync = true
         consecutiveFailures = 0
         lastReportedPlaying = false
@@ -256,22 +269,66 @@ internal class CastBridgePlayer(
         val expected = urlFor(player.currentMediaItem)
         val aboutCurrent = status?.contentId != null && status?.contentId == expected
 
+        // The receiver ran on into the track queued after this one.
+        if (status != null && !aboutCurrent && !loading && status.contentId != null &&
+            status.contentId == queuedNextUrl
+        ) {
+            val next = localPlayer().nextMediaItemIndex
+            val mediaId = queuedNextMediaId
+            queuedNextUrl = null
+            queuedNextMediaId = null
+            if (next != C.INDEX_UNSET) {
+                lastLoadedMediaId = mediaId
+                advanceLocal(next)
+                mediaId?.let(host::onRemoteTrackLoaded)
+            }
+            invalidateState()
+            reportPlaying()
+            return
+        }
+
         if (status != null && aboutCurrent && !loading) {
             when {
                 status.playerState == CastProtocol.PlayerState.IDLE &&
                     status.idleReason == "FINISHED" &&
-                    (previousState != CastProtocol.PlayerState.IDLE || previousContent != status.contentId) ->
-                    onRemoteFinished()
+                    (previousState != CastProtocol.PlayerState.IDLE || previousContent != status.contentId) -> {
+                    if (queuedNextUrl == null) {
+                        onRemoteFinished()
+                    } else {
+                        // A queued track should take over by itself; if the
+                        // receiver has not moved on shortly, move it on.
+                        val finished = status.contentId
+                        mainHandler.postDelayed({
+                            if (active && lastState == CastProtocol.PlayerState.IDLE && lastContentId == finished) {
+                                queuedNextUrl = null
+                                onRemoteFinished()
+                            }
+                        }, QUEUE_HANDOVER_GRACE_MS)
+                    }
+                }
                 status.playerState == CastProtocol.PlayerState.IDLE && status.idleReason == "ERROR" -> {
                     pendingLoadUrl = null
                     TrackLog.d(TAG, "receiver could not play ${status.contentId}")
                     onCurrentTrackFailed()
                 }
-                else -> mirrorRemoteTransport(status.playerState)
+                else -> {
+                    mirrorRemoteTransport(status.playerState)
+                    // Playing the current track: make sure the next one waits behind it.
+                    val desired = desiredNextUrl()
+                    if (queuedNextUrl != desired && desired != unqueueableUrl) requestSync()
+                }
             }
         }
         invalidateState()
         reportPlaying()
+    }
+
+    /** What should be queued after the current track: the local queue's next, unless repeating one. */
+    private fun desiredNextUrl(): String? {
+        val local = localPlayer()
+        if (local.repeatMode == Player.REPEAT_MODE_ONE) return null
+        val next = local.nextMediaItemIndex.takeIf { it != C.INDEX_UNSET } ?: return null
+        return urlFor(local.getMediaItemAt(next))
     }
 
     fun onVolumeChanged() {
@@ -479,7 +536,24 @@ internal class CastBridgePlayer(
         if (remoteHasCurrent(currentUrl)) {
             seekedSinceSync = false
             invalidateState()
-            nextSource?.let { source -> scope.launch(Dispatchers.IO) { server.probe(source) } }
+            val queueNext = if (local.repeatMode == Player.REPEAT_MODE_ONE) null else next
+            reconcileQueue(cast, queueNext, address)
+            return
+        }
+
+        // Skipped forward onto the track already preloaded behind this one:
+        // a jump along the receiver's queue starts it at once.
+        if (currentUrl == queuedNextUrl && remoteIsLive() && local.currentPosition < SKIP_TO_QUEUED_WITHIN_MS) {
+            queuedNextUrl = null
+            queuedNextMediaId = null
+            pendingLoadUrl = currentUrl
+            lastLoadedMediaId = current.mediaId
+            lastTransportCommandAt = SystemClock.elapsedRealtime()
+            cast.queueSkip()
+            if (!local.playWhenReady) cast.pause()
+            host.onRemoteTrackLoaded(current.mediaId)
+            seekedSinceSync = false
+            invalidateState()
             return
         }
 
@@ -520,6 +594,9 @@ internal class CastBridgePlayer(
         pendingLoadUrl = currentUrl
         lastLoadedMediaId = current.mediaId
         lastTransportCommandAt = SystemClock.elapsedRealtime()
+        // A LOAD replaces the receiver's whole queue.
+        queuedNextUrl = null
+        queuedNextMediaId = null
         cast.load(
             CastProtocol.LoadRequest(
                 url = currentUrl,
@@ -543,6 +620,45 @@ internal class CastBridgePlayer(
     }
 
     private var lastLoadedMediaId: String? = null
+
+    /**
+     * Keeps exactly the local queue's next track queued behind the current one
+     * on the receiver, so the receiver preloads it and plays straight on.
+     */
+    private suspend fun reconcileQueue(cast: CastSession, next: MediaItem?, address: String) {
+        val nextSource = next?.localConfiguration?.uri
+        val nextUrl = nextSource?.let { server.audioUrl(address, it) }
+        if (nextUrl == queuedNextUrl) return
+        val status = cast.mediaStatus ?: return
+        val current = status.currentItemId
+        cast.queueRemove(cast.queueItemIds.filter { it != current })
+        queuedNextUrl = null
+        queuedNextMediaId = null
+        if (next == null || nextSource == null || nextUrl == null) return
+        val mimeType = withContext(Dispatchers.IO) { server.probe(nextSource) }
+        if (session !== cast) return
+        if (mimeType == null) {
+            // Left to play the old way: loaded when its turn comes.
+            unqueueableUrl = nextUrl
+            return
+        }
+        val metadata = next.mediaMetadata
+        cast.queueNext(
+            CastProtocol.LoadRequest(
+                url = nextUrl,
+                contentType = mimeType,
+                mediaId = next.mediaId,
+                title = metadata.title?.toString(),
+                artist = metadata.artist?.toString(),
+                album = metadata.albumTitle?.toString(),
+                artworkUrl = server.artworkUrl(address, metadata.artworkUri)?.toString(),
+                startPositionMs = 0,
+                autoplay = true,
+            ),
+        )
+        queuedNextUrl = nextUrl
+        queuedNextMediaId = next.mediaId
+    }
 
     private fun onRemoteFinished() {
         val local = localPlayer()
@@ -701,6 +817,12 @@ internal class CastBridgePlayer(
 
         /** How long a receiver state that contradicts our own last command is put down to latency. */
         const val OWN_COMMAND_GRACE_MS = 2_500L
+
+        /** How long a finished track may wait for the queued one to take over by itself. */
+        const val QUEUE_HANDOVER_GRACE_MS = 4_000L
+
+        /** A skip lands at the start of a track; later than this it is a seek into it, not a skip. */
+        const val SKIP_TO_QUEUED_WITHIN_MS = 1_000L
 
         val REMOTE_DEVICE: DeviceInfo = DeviceInfo.Builder(DeviceInfo.PLAYBACK_TYPE_REMOTE)
             .setMaxVolume(MAX_VOLUME)
