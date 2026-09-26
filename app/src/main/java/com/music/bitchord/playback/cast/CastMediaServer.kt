@@ -584,25 +584,56 @@ internal object LocalAddress {
                 }
         }.getOrDefault(emptyList())
         if (remote is java.net.Inet4Address) {
-            candidates.firstOrNull { (_, address) ->
+            // The device's own network, or nothing: an address anywhere else
+            // (mobile data, once Wi-Fi drops) can never reach it, and trying
+            // only hangs until the connect times out.
+            return candidates.firstOrNull { (_, address) ->
                 sameSubnet(address.address, remote, address.networkPrefixLength.toInt())
-            }?.let { return it.second.address.hostAddress }
+            }?.second?.address?.hostAddress
         }
-        // No cast device address to match against: the Wi-Fi or Ethernet
-        // interface is where a receiver is, never the cellular one.
+        // No device address to match against: the Wi-Fi or Ethernet interface
+        // is where a receiver is, never the cellular one.
         return candidates
+            .filterNot { (nif, _) -> isCellular(nif.name) }
             .sortedBy { (nif, _) ->
                 val name = nif.name.lowercase()
                 when {
                     name.startsWith("wlan") -> 0
                     name.startsWith("eth") -> 1
                     name.startsWith("ap") || name.startsWith("swlan") -> 2
-                    name.startsWith("rmnet") || name.startsWith("ccmni") -> 9
                     else -> 5
                 }
             }
             .firstOrNull()
             ?.second?.address?.hostAddress
+    }
+
+    /**
+     * Whether this phone is on a local network at all — Wi-Fi, Ethernet or
+     * its own hotspot — as opposed to mobile data only. Read from the
+     * interfaces themselves: no permission needed, and a Wi-Fi network without
+     * internet (which Android stops routing through) still counts.
+     */
+    fun hasLocalNetwork(): Boolean = runCatching {
+        java.net.NetworkInterface.getNetworkInterfaces()?.toList().orEmpty().any { nif ->
+            nif.isUp && !nif.isLoopback && !isCellular(nif.name) &&
+                nif.interfaceAddresses.any { address ->
+                    val inet = address.address
+                    inet is java.net.Inet4Address && inet.isSiteLocalAddress
+                }
+        }
+    }.getOrDefault(true)
+
+    /**
+     * Mobile data (named differently by every modem vendor) and VPN tunnels:
+     * interfaces that can carry a private-looking address without being the
+     * network a TV is on.
+     */
+    private fun isCellular(name: String): Boolean {
+        val lower = name.lowercase()
+        return "rmnet" in lower || lower.startsWith("ccmni") || lower.startsWith("pdp") ||
+            lower.startsWith("seth") || lower.startsWith("clat") || lower.startsWith("tun") ||
+            lower.startsWith("ppp") || lower.startsWith("ipsec")
     }
 
     fun sameSubnet(a: InetAddress, b: InetAddress, prefixLength: Int): Boolean {

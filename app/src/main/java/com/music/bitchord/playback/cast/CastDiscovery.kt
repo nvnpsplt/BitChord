@@ -5,6 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.net.wifi.WifiManager
 import com.music.bitchord.data.TrackLog
 import com.music.bitchord.data.settings.AppSettings
@@ -45,6 +46,10 @@ data class CastDevice(
 object CastDiscovery {
 
     private const val SERVICE_TYPE = "_googlecast._tcp"
+
+    /** How often the list is checked, and how long a device may go unheard before it leaves it. */
+    private const val SWEEP_MS = 3_000L
+    private const val STALE_MS = 30_000L
     private const val TAG = "BitChordCast"
 
     private val main = Handler(Looper.getMainLooper())
@@ -59,6 +64,22 @@ object CastDiscovery {
     private var manager: NsdManager? = null
     private var listener: NsdManager.DiscoveryListener? = null
     private val byServiceName = LinkedHashMap<String, CastDevice>()
+
+    /**
+     * When each device found by our own browsers last answered. They ask every
+     * few seconds, so one that has stopped answering — switched off, or this
+     * phone off its Wi-Fi — drops out of the list rather than lingering in it.
+     * NsdManager's finds are not timed: it reports its own losses.
+     */
+    private val seenAt = HashMap<String, Long>()
+
+    private val sweep = object : Runnable {
+        override fun run() {
+            if (users == 0) return
+            sweepStale()
+            main.postDelayed(this, SWEEP_MS)
+        }
+    }
 
     /** NsdManager resolves one service at a time on older Android; the rest wait here. */
     private val resolveQueue = ArrayDeque<NsdServiceInfo>()
@@ -82,6 +103,9 @@ object CastDiscovery {
     fun find(id: String): CastDevice? = found.value.firstOrNull { it.id == id }
 
     private fun begin(context: Context) {
+        // Nothing listed from a previous Wi-Fi survives joining mobile data.
+        if (!LocalAddress.hasLocalNetwork()) forgetAll()
+        main.postDelayed(sweep, SWEEP_MS)
         raw = RawBrowser(context).also { it.start() }
         if (AppSettings.castDlna.value) ssdp = SsdpBrowser(context).also { it.start() }
         val nsd = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return
@@ -112,6 +136,7 @@ object CastDiscovery {
     }
 
     private fun end() {
+        main.removeCallbacks(sweep)
         raw?.stop()
         raw = null
         ssdp?.stop()
@@ -123,8 +148,15 @@ object CastDiscovery {
         listener = null
         resolveQueue.clear()
         resolving = false
-        // What was found stays listed: a device the sheet saw a moment ago is
-        // still there to connect to, and a fresh browse re-confirms the list.
+        // Our own browsers' finds stay listed until they go unheard — see
+        // [seenAt] — so the sheet reopens full. NsdManager's are not timed and
+        // it reports nothing while stopped, so they would outlive a change of
+        // network; it reports every live service again as soon as it restarts.
+        val untimed = byServiceName.keys.filter { it !in seenAt }
+        if (untimed.isNotEmpty()) {
+            untimed.forEach(byServiceName::remove)
+            publish()
+        }
     }
 
     private fun enqueueResolve(service: NsdServiceInfo) {
@@ -176,12 +208,41 @@ object CastDiscovery {
         }.onFailure { done() }
     }
 
+    /** Main thread: drops devices that stopped answering, or everything once off Wi-Fi. */
+    private fun sweepStale() {
+        if (!LocalAddress.hasLocalNetwork()) {
+            forgetAll()
+            return
+        }
+        val now = SystemClock.elapsedRealtime()
+        val stale = seenAt.filterValues { now - it > STALE_MS }.keys
+        if (stale.isEmpty()) return
+        stale.forEach {
+            seenAt.remove(it)
+            byServiceName.remove(it)
+        }
+        publish()
+    }
+
+    private fun forgetAll() {
+        if (byServiceName.isEmpty()) return
+        byServiceName.clear()
+        seenAt.clear()
+        publish()
+    }
+
     private fun publish() {
         val dlnaOn = AppSettings.castDlna.value
         found.value = byServiceName.values
             .filter { dlnaOn || it.dlna == null }
             .distinctBy { it.id }
             .sortedBy { it.name.lowercase() }
+    }
+
+    /** A renderer already described has answered again; main thread. */
+    private fun onRendererSeen(udn: String) {
+        val key = "dlna:$udn"
+        if (key in byServiceName) seenAt[key] = SystemClock.elapsedRealtime()
     }
 
     /** A renderer seen by [SsdpBrowser]; main thread. */
@@ -200,6 +261,7 @@ object CastDiscovery {
             dlna = renderer,
         )
         val key = "dlna:" + renderer.udn
+        seenAt[key] = SystemClock.elapsedRealtime()
         if (byServiceName[key] != device) {
             byServiceName[key] = device
             publish()
@@ -208,6 +270,7 @@ object CastDiscovery {
 
     private fun onRendererGone(usn: String?) {
         val udn = usn?.substringBefore("::") ?: return
+        seenAt.remove("dlna:$udn")
         if (byServiceName.remove("dlna:$udn") != null) publish()
     }
 
@@ -222,6 +285,7 @@ object CastDiscovery {
         @Volatile private var running = false
         private var socket: DatagramSocket? = null
         private val described = java.util.concurrent.ConcurrentHashMap<String, Long>()
+        private val udnByLocation = java.util.concurrent.ConcurrentHashMap<String, String>()
 
         fun start() {
             running = true
@@ -269,7 +333,10 @@ object CastDiscovery {
                     val locationHost = runCatching { java.net.URI(announcement.location).host }.getOrNull()
                     if (locationHost == null || InetAddress.getByName(locationHost) != packet.address) continue
                     val seen = described[announcement.location]
-                    if (seen != null && now - seen < REDESCRIBE_MS) continue
+                    if (seen != null && now - seen < REDESCRIBE_MS) {
+                        udnByLocation[announcement.location]?.let { udn -> main.post { onRendererSeen(udn) } }
+                        continue
+                    }
                     described[announcement.location] = now
                     describe(announcement.location)
                 } catch (_: SocketTimeoutException) {
@@ -289,7 +356,10 @@ object CastDiscovery {
                     Dlna.parseDescription(response.body, location)
                 }.onFailure { TrackLog.d(TAG, "DLNA description at $location failed: ${it.message}") }
                     .getOrNull()
-                if (renderer != null) main.post { onRenderer(renderer) }
+                if (renderer != null) {
+                    udnByLocation[location] = renderer.udn
+                    main.post { onRenderer(renderer) }
+                }
             }, "dlna-describe").apply { isDaemon = true }.start()
         }
 
@@ -315,6 +385,7 @@ object CastDiscovery {
             isGroup = CastTxt.isGroup(instance.txt),
         )
         val key = "mdns:" + instance.name.lowercase()
+        seenAt[key] = SystemClock.elapsedRealtime()
         if (byServiceName[key] != device) {
             byServiceName[key] = device
             publish()

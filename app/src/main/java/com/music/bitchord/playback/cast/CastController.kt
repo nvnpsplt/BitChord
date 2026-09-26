@@ -105,7 +105,7 @@ internal class CastController(
             TrackLog.d(TAG, "cannot cast: no LAN address or the media server failed to start")
             CastStatus.showNotice(
                 R.string.cast_connect_failed,
-                if (hostAddress == null) "no Wi-Fi address on this phone" else "media server failed to start",
+                if (hostAddress == null) "this phone is not on ${target.name}'s Wi-Fi" else "media server failed to start",
             )
             return
         }

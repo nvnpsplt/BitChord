@@ -481,7 +481,8 @@ internal class DlnaSession(
         const val POLL_MS = 1_000L
         const val TIMEOUT_MS = 5_000
         const val VOLUME_EVERY_POLLS = 5
-        const val MAX_POLL_FAILURES = 10
+        /** Missed polls before the renderer counts as gone; each can wait out TIMEOUT_MS. */
+        const val MAX_POLL_FAILURES = 4
 
         /** How long a renderer may take to start a track before STOPPED means it could not. */
         const val LOAD_GRACE_MS = 10_000L
