@@ -1282,6 +1282,8 @@
     <!-- Google Cast -->
     <string name="cast_section_title">Enviar</string>
     <string name="cast_searching">Buscando dispositivos en tu Wi-Fi…</string>
+    <string name="cast_none_found">No se encontraron dispositivos</string>
+    <string name="cast_open_picker">Toca para abrir el selector de dispositivos Cast</string>
     <string name="cast_connecting">Conectando…</string>
     <string name="cast_casting">Enviando</string>
     <string name="cast_casting_to">Enviando a %1$s</string>
