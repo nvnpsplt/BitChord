@@ -1618,7 +1618,7 @@ class PlaybackService : MediaLibraryService() {
         }
     }
 
-    private val castHost = object : CastController.Host {
+    private val castHost = object : com.music.bitchord.playback.cast.CastHost {
         override val localPlayer: Player? get() = player
 
         override fun useSessionPlayer(player: Player) {
