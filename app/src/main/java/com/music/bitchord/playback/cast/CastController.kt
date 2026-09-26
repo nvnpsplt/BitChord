@@ -103,7 +103,10 @@ internal class CastController(
         hostAddress = LocalAddress.pickFor(runCatching { InetAddress.getByName(target.host) }.getOrNull())
         if (hostAddress == null || !server.start()) {
             TrackLog.d(TAG, "cannot cast: no LAN address or the media server failed to start")
-            CastStatus.showNotice(R.string.cast_connect_failed)
+            CastStatus.showNotice(
+                R.string.cast_connect_failed,
+                if (hostAddress == null) "no Wi-Fi address on this phone" else "media server failed to start",
+            )
             return
         }
         device = target
@@ -187,7 +190,7 @@ internal class CastController(
         override fun onClosed(error: String?) {
             val wasCasting = bridge.active
             TrackLog.d(TAG, "cast session closed: ${error ?: "normally"}")
-            if (!wasCasting && error != null) CastStatus.showNotice(R.string.cast_connect_failed)
+            if (!wasCasting && error != null) CastStatus.showNotice(R.string.cast_connect_failed, error)
             session = null
             stopCasting(prepareLocal = true)
         }

@@ -220,7 +220,7 @@ internal class CastSession(
                     TrackLog.d(TAG, "cast device $host failed authentication: ${e.message}")
                 }
                 TrackLog.d(TAG, "cast connection to $host lost: ${e.javaClass.simpleName} ${e.message}")
-                main.post { shutDown(e.message ?: e.javaClass.simpleName, notify = true) }
+                main.post { shutDown("Cast ${e.javaClass.simpleName}${e.message?.let { ": $it" }.orEmpty()}", notify = true) }
             }
         }
     }
@@ -393,7 +393,7 @@ internal class CastSession(
                     out.write(bytes)
                     out.flush()
                 } catch (e: IOException) {
-                    main.post { shutDown(e.message, notify = true) }
+                    main.post { shutDown("Cast ${e.javaClass.simpleName}${e.message?.let { ": $it" }.orEmpty()}", notify = true) }
                 }
             }
         }

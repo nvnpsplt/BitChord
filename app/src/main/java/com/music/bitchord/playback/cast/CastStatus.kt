@@ -47,12 +47,17 @@ object CastStatus {
      * A one-line message for the listener, e.g. why a track was skipped on the
      * receiver. Consumed by the UI with [consumeNotice].
      */
-    private val notice = MutableStateFlow<Int?>(null)
-    val pendingNotice: StateFlow<Int?> = notice.asStateFlow()
+    private val notice = MutableStateFlow<Notice?>(null)
+    val pendingNotice: StateFlow<Notice?> = notice.asStateFlow()
 
-    internal fun showNotice(messageRes: Int) {
-        notice.value = messageRes
+    /** [detail] is the underlying reason, in the device's or the system's own words, when there is one. */
+    data class Notice(val messageRes: Int, val detail: String? = null)
+
+    internal fun showNotice(messageRes: Int, detail: String? = null) {
+        notice.value = Notice(messageRes, detail?.take(MAX_DETAIL_CHARS))
     }
+
+    private const val MAX_DETAIL_CHARS = 160
 
     fun consumeNotice() {
         notice.value = null

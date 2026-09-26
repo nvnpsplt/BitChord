@@ -98,7 +98,7 @@ internal class DlnaSession(
                 worker.scheduleWithFixedDelay({ poll() }, POLL_MS, POLL_MS, TimeUnit.MILLISECONDS)
             } catch (e: Exception) {
                 TrackLog.d(TAG, "DLNA renderer unreachable at ${renderer.avTransportUrl}: ${e.javaClass.simpleName}: ${e.message}")
-                main.post { shutDown(e.message ?: "unreachable") }
+                main.post { shutDown("DLNA ${e.javaClass.simpleName}${e.message?.let { ": $it" }.orEmpty()}") }
             }
         }
     }
