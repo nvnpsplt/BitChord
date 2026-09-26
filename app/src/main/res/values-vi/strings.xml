@@ -1242,6 +1242,7 @@
     <string name="cast_blocked_party">Không thể truyền khi đang dùng Listen Together</string>
     <string name="cast_track_skipped">Đã bỏ qua một bài mà thiết bị không phát được</string>
     <string name="cast_connect_failed">Không thể bắt đầu truyền. Hãy đảm bảo điện thoại và thiết bị dùng cùng một mạng Wi-Fi.</string>
+    <string name="cast_connect_failed_reason">Không thể truyền: %1$s</string>
     <string name="cast_feature_unavailable">Không khả dụng khi đang truyền</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">Hiển thị thiết bị Chromecast và Google Cast trong mục chọn đầu ra</string>

@@ -1325,6 +1325,7 @@
     <string name="cast_blocked_party">העברה אינה זמינה במהלך Listen Together</string>
     <string name="cast_track_skipped">דולג שיר שהמכשיר לא הצליח לנגן</string>
     <string name="cast_connect_failed">לא ניתן להתחיל העברה. ודא שהטלפון והמכשיר מחוברים לאותה רשת Wi-Fi.</string>
+    <string name="cast_connect_failed_reason">ההעברה נכשלה: %1$s</string>
     <string name="cast_feature_unavailable">לא זמין בזמן העברה</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">הצג מכשירי Chromecast ו-Google Cast בבחירת הפלט</string>

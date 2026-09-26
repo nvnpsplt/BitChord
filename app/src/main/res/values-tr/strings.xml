@@ -1275,6 +1275,7 @@
     <string name="cast_blocked_party">Listen Together sırasında yayın kullanılamaz</string>
     <string name="cast_track_skipped">Cihazın çalamadığı bir şarkı atlandı</string>
     <string name="cast_connect_failed">Yayın başlatılamadı. Telefonun ve cihazın aynı Wi-Fi ağında olduğundan emin olun.</string>
+    <string name="cast_connect_failed_reason">Yayınlanamadı: %1$s</string>
     <string name="cast_feature_unavailable">Yayın sırasında kullanılamaz</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">Çıkış seçicide Chromecast ve Google Cast cihazlarını göster</string>

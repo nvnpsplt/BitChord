@@ -1307,6 +1307,7 @@
     <string name="cast_blocked_party">ไม่สามารถแคสต์ระหว่าง Listen Together</string>
     <string name="cast_track_skipped">ข้ามเพลงที่อุปกรณ์แคสต์เล่นไม่ได้</string>
     <string name="cast_connect_failed">เริ่มแคสต์ไม่ได้ ตรวจสอบว่าโทรศัพท์และอุปกรณ์อยู่ใน Wi-Fi เดียวกัน</string>
+    <string name="cast_connect_failed_reason">แคสต์ไม่ได้: %1$s</string>
     <string name="cast_feature_unavailable">ใช้ไม่ได้ขณะแคสต์</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">แสดงอุปกรณ์ Chromecast และ Google Cast ในตัวเลือกเอาต์พุต</string>

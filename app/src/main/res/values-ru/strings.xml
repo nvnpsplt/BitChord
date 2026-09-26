@@ -1346,6 +1346,7 @@
     <string name="cast_blocked_party">Трансляция недоступна во время Listen Together</string>
     <string name="cast_track_skipped">Пропущен трек, который устройство не смогло воспроизвести</string>
     <string name="cast_connect_failed">Не удалось начать трансляцию. Убедитесь, что телефон и устройство подключены к одной сети Wi-Fi.</string>
+    <string name="cast_connect_failed_reason">Не удалось начать трансляцию: %1$s</string>
     <string name="cast_feature_unavailable">Недоступно во время трансляции</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">Показывать устройства Chromecast и Google Cast при выборе вывода</string>

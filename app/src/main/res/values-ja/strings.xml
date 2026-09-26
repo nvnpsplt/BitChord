@@ -1301,6 +1301,7 @@
     <string name="cast_blocked_party">Listen Together 中はキャストできません</string>
     <string name="cast_track_skipped">キャストデバイスで再生できない曲をスキップしました</string>
     <string name="cast_connect_failed">キャストを開始できませんでした。スマートフォンとデバイスが同じ Wi-Fi に接続されているか確認してください。</string>
+    <string name="cast_connect_failed_reason">キャストできません: %1$s</string>
     <string name="cast_feature_unavailable">キャスト中は利用できません</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">出力の選択に Chromecast と Google Cast デバイスを表示</string>
