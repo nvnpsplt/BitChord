@@ -1330,5 +1330,7 @@
     <string name="cast_setting_subtitle">הצג מכשירי Chromecast ו-Google Cast בבחירת הפלט</string>
     <string name="cast_continue_title">המשך לנגן אחרי ההעברה</string>
     <string name="cast_continue_subtitle">כשהעברה מסתיימת, להמשיך לנגן מהטלפון הזה</string>
+    <string name="cast_captions_title">מילים בטלוויזיה (ניסיוני)</string>
+    <string name="cast_captions_subtitle">הצגת מילים מסונכרנות ככתוביות במקלט של Google</string>
 
 </resources>

@@ -21,6 +21,7 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.music.bitchord.R
 import com.music.bitchord.data.TrackLog
+import com.music.bitchord.data.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -608,6 +609,7 @@ internal class CastBridgePlayer(
                 artworkUrl = server.artworkUrl(address, metadata.artworkUri)?.toString(),
                 startPositionMs = startPosition,
                 autoplay = local.playWhenReady,
+                captionsUrl = captionsUrl(address, current),
             ),
         )
         host.onRemoteTrackLoaded(current.mediaId)
@@ -654,6 +656,7 @@ internal class CastBridgePlayer(
                 artworkUrl = server.artworkUrl(address, metadata.artworkUri)?.toString(),
                 startPositionMs = 0,
                 autoplay = true,
+                captionsUrl = captionsUrl(address, next),
             ),
         )
         queuedNextUrl = nextUrl
@@ -746,6 +749,15 @@ internal class CastBridgePlayer(
         val source = item?.localConfiguration?.uri ?: return null
         val address = host.hostAddress() ?: return null
         return server.audioUrl(address, source)
+    }
+
+    /**
+     * The lyrics-as-subtitles file for [item], when that experiment is on. Only
+     * on Google's stock receiver: BitChord's own receiver shows lyrics itself.
+     */
+    private fun captionsUrl(address: String, item: MediaItem): String? {
+        if (CastSupport.hasCustomReceiver || !AppSettings.castLyricsCaptions.value) return null
+        return server.captionsUrl(address, item)
     }
 
     private fun remoteIsLive(): Boolean {

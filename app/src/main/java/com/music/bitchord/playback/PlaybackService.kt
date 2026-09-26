@@ -109,6 +109,7 @@ import com.music.bitchord.data.innertube.PlayerClient
 import com.music.bitchord.data.innertube.StreamResolver
 import com.music.bitchord.data.model.LikeStatus
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.scrobbling.LastFM
 import com.music.bitchord.data.scrobbling.ListenBrainzManager
 import com.music.bitchord.data.scrobbling.ScrobbleManager
@@ -1664,6 +1665,18 @@ class PlaybackService : MediaLibraryService() {
 
         override fun onRemoteQueueEnded() {
             playhead?.let(::onQueueRanDry)
+        }
+
+        // On a media server thread: the TV is waiting on this file, so the
+        // lookup is bounded, and a miss shows no captions rather than none ever.
+        override fun lyricsFor(item: MediaItem): List<LyricLine>? {
+            if (!AppSettings.syncedLyrics.value) return null
+            val song = item.toSong()
+            return runBlocking(Dispatchers.IO) {
+                withTimeoutOrNull(CAST_LYRICS_TIMEOUT_MS) {
+                    runCatching { findLyrics(song, song.durationMillis()) }.getOrNull()
+                }
+            }
         }
     }
 
@@ -6407,24 +6420,7 @@ class PlaybackService : MediaLibraryService() {
 
         serviceLyricsJob?.cancel()
         serviceLyricsJob = scope.launch(Dispatchers.IO) {
-            val localUri = currentSong.localUri
-            var lines: List<LyricLine>? = null
-            if (localUri != null) {
-                lines = EmbeddedLyrics.forUri(this@PlaybackService, localUri)
-            }
-            if (lines == null) {
-                val found = LyricsRepository.lyrics(
-                    videoId = currentSong.videoId,
-                    title = currentSong.title,
-                    artist = currentSong.artist,
-                    durationMs = trackDurationMs,
-                    album = currentSong.albumName,
-                    sources = AppSettings.lyricsSources.value,
-                    order = AppSettings.lyricsSourceOrder.value,
-                    prioritizeSyllableSync = AppSettings.prioritizeSyllableSync.value,
-                )
-                lines = found?.lines
-            }
+            val lines = findLyrics(currentSong, trackDurationMs)
             withContext(Dispatchers.Main) {
                 serviceLyrics = lines
                 // Kept by the cast controller even while not casting, so a
@@ -6435,6 +6431,23 @@ class PlaybackService : MediaLibraryService() {
                 }
             }
         }
+    }
+
+    /** [song]'s lyrics: embedded in the file where it has them, else from the providers. */
+    private suspend fun findLyrics(song: Song, durationMs: Long): List<LyricLine>? {
+        song.localUri?.let { localUri ->
+            EmbeddedLyrics.forUri(this@PlaybackService, localUri)?.let { return it }
+        }
+        return LyricsRepository.lyrics(
+            videoId = song.videoId,
+            title = song.title,
+            artist = song.artist,
+            durationMs = durationMs,
+            album = song.albumName,
+            sources = AppSettings.lyricsSources.value,
+            order = AppSettings.lyricsSourceOrder.value,
+            prioritizeSyllableSync = AppSettings.prioritizeSyllableSync.value,
+        )?.lines
     }
 
     private fun startLyricsTicker() {
@@ -7730,6 +7743,13 @@ class PlaybackService : MediaLibraryService() {
          * enough that a dead server costs a pause rather than a stall.
          */
         const val SUBSTITUTE_TIMEOUT_MS = 20_000L
+
+        /**
+         * How long the TV's request for a track's lyrics captions waits on the
+         * lookup. The receiver fetches them as the track loads, so past this
+         * the track simply plays without.
+         */
+        const val CAST_LYRICS_TIMEOUT_MS = 8_000L
 
         /**
          * How much of a track has to be left for a mid-track quality swap to

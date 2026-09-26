@@ -1326,5 +1326,7 @@
     <string name="cast_setting_subtitle">Afficher les appareils Chromecast et Google Cast dans le choix de sortie</string>
     <string name="cast_continue_title">Continuer après le cast</string>
     <string name="cast_continue_subtitle">À la fin d\'une session de cast, continuer la lecture sur ce téléphone</string>
+    <string name="cast_captions_title">Paroles sur la TV (expérimental)</string>
+    <string name="cast_captions_subtitle">Afficher les paroles synchronisées en sous-titres sur le récepteur de Google</string>
 
 </resources>

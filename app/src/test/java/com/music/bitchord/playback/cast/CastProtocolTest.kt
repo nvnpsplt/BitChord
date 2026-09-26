@@ -92,6 +92,29 @@ class CastProtocolTest {
     }
 
     @Test
+    fun captions_ride_alongAsAnActiveTextTrack() {
+        val request = CastProtocol.LoadRequest(
+            "http://p/a/1", "audio/webm", "id1", "T", null, null, null, 0, true,
+            captionsUrl = "http://p/l/1",
+        )
+        val load = json(CastProtocol.load(1, "s1", request))
+        assertEquals("1", load["activeTrackIds"]!!.jsonArray.single().jsonPrimitive.content)
+        val track = load["media"]!!.jsonObject["tracks"]!!.jsonArray.single().jsonObject
+        assertEquals("TEXT", track["type"]!!.jsonPrimitive.content)
+        assertEquals("SUBTITLES", track["subtype"]!!.jsonPrimitive.content)
+        assertEquals("http://p/l/1", track["trackContentId"]!!.jsonPrimitive.content)
+        assertEquals("text/vtt", track["trackContentType"]!!.jsonPrimitive.content)
+
+        val item = json(CastProtocol.queueInsert(2, 3, request, 20))["items"]!!.jsonArray.single().jsonObject
+        assertEquals("1", item["activeTrackIds"]!!.jsonArray.single().jsonPrimitive.content)
+        assertTrue(item["media"]!!.jsonObject.containsKey("tracks"))
+
+        val plain = json(CastProtocol.load(1, "s1", request.copy(captionsUrl = null)))
+        assertFalse(plain.containsKey("activeTrackIds"))
+        assertFalse(plain["media"]!!.jsonObject.containsKey("tracks"))
+    }
+
+    @Test
     fun receiverStatus_findsTheApp() {
         val status = CastProtocol.parseReceiverStatus(
             json(

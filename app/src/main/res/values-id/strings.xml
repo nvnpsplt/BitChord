@@ -1305,5 +1305,7 @@
     <string name="cast_setting_subtitle">Tampilkan perangkat Chromecast dan Google Cast di pemilih output</string>
     <string name="cast_continue_title">Tetap putar setelah transmisi</string>
     <string name="cast_continue_subtitle">Saat sesi transmisi berakhir, lanjutkan pemutaran dari ponsel ini</string>
+    <string name="cast_captions_title">Lirik di TV (eksperimental)</string>
+    <string name="cast_captions_subtitle">Tampilkan lirik tersinkron sebagai subtitel di penerima Google</string>
 
 </resources>

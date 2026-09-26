@@ -1297,5 +1297,7 @@
     <string name="cast_setting_subtitle">Mostrar dispositivos Chromecast y Google Cast en el selector de salida</string>
     <string name="cast_continue_title">Seguir reproduciendo al dejar de enviar</string>
     <string name="cast_continue_subtitle">Al terminar una sesión de envío, continuar en este teléfono</string>
+    <string name="cast_captions_title">Letras en la TV (experimental)</string>
+    <string name="cast_captions_subtitle">Mostrar letras sincronizadas como subtítulos en el receptor de Google</string>
 
 </resources>

@@ -1280,5 +1280,7 @@
     <string name="cast_setting_subtitle">Çıkış seçicide Chromecast ve Google Cast cihazlarını göster</string>
     <string name="cast_continue_title">Yayından sonra çalmaya devam et</string>
     <string name="cast_continue_subtitle">Yayın oturumu bittiğinde bu telefondan çalmaya devam et</string>
+    <string name="cast_captions_title">TV\'de şarkı sözleri (deneysel)</string>
+    <string name="cast_captions_subtitle">Senkronize şarkı sözlerini Google alıcısında altyazı olarak göster</string>
 
 </resources>

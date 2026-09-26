@@ -72,8 +72,21 @@ internal class CastController(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 8
     }
 
+    /**
+     * The last few tracks' lyrics as found for the phone's own lyrics screen,
+     * so captions for the current track need no second lookup. Read from the
+     * media server's threads, hence the lock.
+     */
+    private val captionLines = object : LinkedHashMap<String, List<LyricLine>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<LyricLine>>?): Boolean = size > 8
+    }
+
     init {
         CastConnector.controller = this
+        server.captions = { item ->
+            val lines = synchronized(captionLines) { captionLines[item.mediaId] } ?: host.lyricsFor(item)
+            CastCaptions.webVtt(lines.orEmpty().map { CastCaptions.Line(it.timeMs, it.text, it.sungUntilMs) })
+        }
     }
 
     /** Connects to [target] and, once its receiver is up, moves playback there. */
@@ -121,9 +134,11 @@ internal class CastController(
     /**
      * Hands [lines] for [mediaId] to BitChord's receiver, or remembers them for
      * when that track reaches the TV. Does nothing on the stock receiver, which
-     * has no lyrics screen to show them on.
+     * has no lyrics screen — there they may become subtitles instead, see
+     * [CastCaptions].
      */
     fun sendLyrics(mediaId: String, lines: List<LyricLine>?) {
+        if (lines != null) synchronized(captionLines) { captionLines[mediaId] = lines }
         if (!CastSupport.hasCustomReceiver) return
         val message = CastLyrics.message(mediaId, lines)
         lyricsMessages[mediaId] = message

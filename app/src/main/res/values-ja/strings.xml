@@ -1306,5 +1306,7 @@
     <string name="cast_setting_subtitle">出力の選択に Chromecast と Google Cast デバイスを表示</string>
     <string name="cast_continue_title">キャスト終了後も再生を続ける</string>
     <string name="cast_continue_subtitle">キャストセッションが終了したら、このスマートフォンで再生を続けます</string>
+    <string name="cast_captions_title">テレビに歌詞を表示（試験運用）</string>
+    <string name="cast_captions_subtitle">同期歌詞を Google のレシーバーに字幕として表示します</string>
 
 </resources>

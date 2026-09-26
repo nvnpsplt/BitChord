@@ -1351,5 +1351,7 @@
     <string name="cast_setting_subtitle">Показывать устройства Chromecast и Google Cast при выборе вывода</string>
     <string name="cast_continue_title">Продолжать после трансляции</string>
     <string name="cast_continue_subtitle">Когда трансляция заканчивается, продолжать воспроизведение на этом телефоне</string>
+    <string name="cast_captions_title">Текст песни на ТВ (экспериментально)</string>
+    <string name="cast_captions_subtitle">Показывать синхронизированный текст как субтитры на приёмнике Google</string>
 
 </resources>

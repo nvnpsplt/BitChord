@@ -1325,5 +1325,7 @@
     <string name="cast_setting_subtitle">आउटपुट चुनने में Chromecast और Google Cast डिवाइस दिखाएं</string>
     <string name="cast_continue_title">कास्ट के बाद बजाते रहें</string>
     <string name="cast_continue_subtitle">कास्ट सेशन खत्म होने पर इस फ़ोन से बजाना जारी रखें</string>
+    <string name="cast_captions_title">टीवी पर लिरिक्स (प्रायोगिक)</string>
+    <string name="cast_captions_subtitle">Google के रिसीवर पर सिंक किए गए लिरिक्स सबटाइटल के रूप में दिखाएँ</string>
 
 </resources>

@@ -3,6 +3,7 @@ package com.music.bitchord.playback.cast
 import android.content.Context
 import android.net.Uri
 import androidx.media3.common.C
+import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
@@ -52,9 +53,10 @@ internal class CastMediaServer(
     private val dataSourceFactory: DataSource.Factory,
 ) {
 
-    private enum class Kind { AUDIO, IMAGE }
+    private enum class Kind { AUDIO, IMAGE, CAPTIONS }
 
-    private class Entry(val kind: Kind, val uri: Uri) {
+    /** [item] is set for [Kind.CAPTIONS]: the track whose lyrics are asked for. */
+    private class Entry(val kind: Kind, val uri: Uri, val item: MediaItem? = null) {
         /** Learned from the bytes on first read — see [CastMime.sniff]. */
         @Volatile var mimeType: String? = null
 
@@ -66,6 +68,13 @@ internal class CastMediaServer(
     private val tokensBySource = ConcurrentHashMap<String, String>()
     private val random = SecureRandom()
     private val threadCount = AtomicInteger()
+
+    /**
+     * Turns a track into the WebVTT the receiver shows as subtitles — see
+     * [CastCaptions]. Called on a server thread and allowed to block while the
+     * lyrics are looked up; set while lyrics captions are on.
+     */
+    @Volatile var captions: ((MediaItem) -> String)? = null
 
     @Volatile private var serverSocket: ServerSocket? = null
     @Volatile private var workers: ExecutorService? = null
@@ -135,6 +144,16 @@ internal class CastMediaServer(
         return Uri.parse(urlFor(host, port, IMAGE_PATH, token(Kind.IMAGE, artworkUri)))
     }
 
+    /** Where the receiver fetches [item]'s lyrics as a subtitle file, reached at [host]. */
+    fun captionsUrl(host: String, item: MediaItem): String? {
+        val port = port ?: return null
+        val key = sourceKey(Kind.CAPTIONS, Uri.fromParts(CAPTIONS_SCHEME, item.mediaId, null))
+        val token = tokensBySource.getOrPut(key) {
+            newToken().also { entries[it] = Entry(Kind.CAPTIONS, Uri.EMPTY, item) }
+        }
+        return urlFor(host, port, CAPTIONS_PATH, token)
+    }
+
     /**
      * What the receiver will be told [sourceUri] is, found by opening it.
      *
@@ -171,11 +190,13 @@ internal class CastMediaServer(
     private fun token(kind: Kind, uri: Uri): String {
         val key = sourceKey(kind, uri)
         return tokensBySource.getOrPut(key) {
-            val bytes = ByteArray(TOKEN_BYTES).also(random::nextBytes)
-            val token = bytes.joinToString("") { "%02x".format(it) }
-            entries[token] = Entry(kind, uri)
-            token
+            newToken().also { entries[it] = Entry(kind, uri) }
         }
+    }
+
+    private fun newToken(): String {
+        val bytes = ByteArray(TOKEN_BYTES).also(random::nextBytes)
+        return bytes.joinToString("") { "%02x".format(it) }
     }
 
     private fun acceptLoop(socket: ServerSocket, pool: ExecutorService) {
@@ -222,7 +243,8 @@ internal class CastMediaServer(
             ?.let { (prefix, token) ->
                 entries[token]?.takeIf {
                     (prefix == AUDIO_PATH && it.kind == Kind.AUDIO) ||
-                        (prefix == IMAGE_PATH && it.kind == Kind.IMAGE)
+                        (prefix == IMAGE_PATH && it.kind == Kind.IMAGE) ||
+                        (prefix == CAPTIONS_PATH && it.kind == Kind.CAPTIONS)
                 }
             }
         if (entry == null) {
@@ -232,7 +254,27 @@ internal class CastMediaServer(
         when (entry.kind) {
             Kind.AUDIO -> serveAudio(entry, request, output)
             Kind.IMAGE -> serveImage(entry, request, output)
+            Kind.CAPTIONS -> serveCaptions(entry, request, output)
         }
+    }
+
+    private fun serveCaptions(entry: Entry, request: HttpRequest, output: OutputStream) {
+        val item = entry.item
+        // An empty file rather than an error when there is nothing to show: a
+        // failed text track can fail the whole load on some receivers.
+        val vtt = item?.let { target ->
+            runCatching { captions?.invoke(target) }
+                .onFailure { TrackLog.d(TAG, "cast captions failed: ${it.message}") }
+                .getOrNull()
+        } ?: CastCaptions.EMPTY
+        val body = vtt.toByteArray(Charsets.UTF_8)
+        writeHead(
+            output,
+            200,
+            "OK",
+            mapOf("Content-Type" to "text/vtt; charset=utf-8", "Content-Length" to body.size.toString()),
+        )
+        if (request.method != "HEAD") output.write(body)
     }
 
     private fun serveAudio(entry: Entry, request: HttpRequest, output: OutputStream) {
@@ -380,6 +422,8 @@ internal class CastMediaServer(
         const val TAG = "BitChordCast"
         const val AUDIO_PATH = "a"
         const val IMAGE_PATH = "i"
+        const val CAPTIONS_PATH = "l"
+        const val CAPTIONS_SCHEME = "bitchord-lyrics"
         const val AUDIO_PREFIX = "AUDIO|"
         const val BACKLOG = 16
         const val TOKEN_BYTES = 16

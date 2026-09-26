@@ -1325,5 +1325,7 @@
     <string name="cast_setting_subtitle">Chromecast- und Google-Cast-Geräte in der Ausgabeauswahl anzeigen</string>
     <string name="cast_continue_title">Nach dem Streamen weiterspielen</string>
     <string name="cast_continue_subtitle">Nach dem Ende einer Cast-Sitzung auf diesem Handy weiterspielen</string>
+    <string name="cast_captions_title">Songtexte auf dem TV (experimentell)</string>
+    <string name="cast_captions_subtitle">Synchronisierte Songtexte als Untertitel auf Googles Receiver anzeigen</string>
 
 </resources>

@@ -1305,5 +1305,7 @@
     <string name="cast_setting_subtitle">在输出选择中显示 Chromecast 和 Google Cast 设备</string>
     <string name="cast_continue_title">投放结束后继续播放</string>
     <string name="cast_continue_subtitle">投放会话结束时，在这部手机上继续播放</string>
+    <string name="cast_captions_title">在电视上显示歌词（实验性）</string>
+    <string name="cast_captions_subtitle">在 Google 接收器上以字幕形式显示同步歌词</string>
 
 </resources>

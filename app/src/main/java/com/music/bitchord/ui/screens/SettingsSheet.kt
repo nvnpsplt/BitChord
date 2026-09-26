@@ -40,6 +40,7 @@ import androidx.compose.material.icons.rounded.BlurOff
 import androidx.compose.material.icons.rounded.BlurOn
 import androidx.compose.material.icons.rounded.Brightness4
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ClosedCaption
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.Cloud
 import androidx.compose.material.icons.rounded.DeleteSweep
@@ -195,6 +196,7 @@ fun SettingsScreen(
     // No Cast rows where Cast cannot work: FOSS builds, phones without Play services.
     val castSupported = remember(context) { com.music.bitchord.playback.cast.CastSupport.isAvailable(context) }
     val castContinueOnPhone by AppSettings.castContinueOnPhone.collectAsStateWithLifecycle()
+    val castLyricsCaptions by AppSettings.castLyricsCaptions.collectAsStateWithLifecycle()
     val dolbyAtmos by AppSettings.dolbyAtmos.collectAsStateWithLifecycle()
     // A property of the hardware, so it is read once rather than remembered
     // against a key that can never change — see [DeviceCodecs.playsDolbyAtmos],
@@ -726,6 +728,28 @@ fun SettingsScreen(
                         },
                         onClick = { AppSettings.setCastContinueOnPhone(!castContinueOnPhone) },
                     )
+                }
+                // BitChord's own receiver shows lyrics itself; this is for Google's.
+                if (!com.music.bitchord.playback.cast.CastSupport.hasCustomReceiver) {
+                    val castCaptionsTitle = stringResource(R.string.cast_captions_title)
+                    row(castCaptionsTitle, "cast", "chromecast", "lyrics", "subtitles", "captions") {
+                        SettingsRow(
+                            icon = Icons.Rounded.ClosedCaption,
+                            title = castCaptionsTitle,
+                            subtitle = stringResource(R.string.cast_captions_subtitle),
+                            trailing = {
+                                Switch(
+                                    checked = castLyricsCaptions,
+                                    onCheckedChange = AppSettings::setCastLyricsCaptions,
+                                    colors = SwitchDefaults.colors(
+                                        checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                        checkedBorderColor = MaterialTheme.colorScheme.primary,
+                                    ),
+                                )
+                            },
+                            onClick = { AppSettings.setCastLyricsCaptions(!castLyricsCaptions) },
+                        )
+                    }
                 }
             }
             val spatialAudioTitle = stringResource(R.string.spatial_audio)
