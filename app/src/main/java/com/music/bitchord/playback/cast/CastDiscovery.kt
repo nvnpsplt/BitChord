@@ -284,32 +284,13 @@ object CastDiscovery {
         private fun describe(location: String) {
             Thread({
                 val renderer = runCatching {
-                    val url = java.net.URL(location)
-                    if (url.protocol != "http") return@runCatching null
-                    val connection = url.openConnection() as java.net.HttpURLConnection
-                    try {
-                        connection.connectTimeout = DESCRIBE_TIMEOUT_MS
-                        connection.readTimeout = DESCRIBE_TIMEOUT_MS
-                        if (connection.responseCode != 200) return@runCatching null
-                        val bytes = connection.inputStream.use { it.readNBytesCompat(MAX_DESCRIPTION_BYTES) }
-                        Dlna.parseDescription(bytes, location)
-                    } finally {
-                        connection.disconnect()
-                    }
-                }.getOrNull()
+                    val response = LanHttp.get(location, DESCRIBE_TIMEOUT_MS, MAX_DESCRIPTION_BYTES)
+                    if (response.code != 200) return@runCatching null
+                    Dlna.parseDescription(response.body, location)
+                }.onFailure { TrackLog.d(TAG, "DLNA description at $location failed: ${it.message}") }
+                    .getOrNull()
                 if (renderer != null) main.post { onRenderer(renderer) }
             }, "dlna-describe").apply { isDaemon = true }.start()
-        }
-
-        private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
-            val out = java.io.ByteArrayOutputStream()
-            val chunk = ByteArray(8192)
-            while (out.size() < limit) {
-                val read = read(chunk, 0, minOf(chunk.size, limit - out.size()))
-                if (read < 0) break
-                out.write(chunk, 0, read)
-            }
-            return out.toByteArray()
         }
 
         private companion object {
