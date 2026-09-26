@@ -80,12 +80,16 @@ object CastStatus {
 object CastSupport {
 
     /**
-     * The Default Media Receiver. Chosen over registering a receiver of our own
-     * because it needs no Cast Console entry to sideload and play: it plays any
-     * plain audio URL, shows the artwork and titles it is given, and is the same
-     * receiver every Media3 app uses.
+     * Whether this build carries BitChord's own receiver (docs/cast-receiver),
+     * which shows BitChord's screen and synced lyrics on the TV. Builds without
+     * one fall back to Media3's stock receiver, which plays everything the same
+     * but only shows the artwork and titles — and calls itself "ExoPlayer".
      */
-    const val RECEIVER_APP_ID: String = DefaultCastOptionsProvider.APP_ID_DEFAULT_RECEIVER_WITH_DRM
+    val hasCustomReceiver: Boolean = com.music.bitchord.BuildConfig.CAST_RECEIVER_APP_ID.isNotBlank()
+
+    /** The receiver app the TV launches — see [hasCustomReceiver]. */
+    val RECEIVER_APP_ID: String = com.music.bitchord.BuildConfig.CAST_RECEIVER_APP_ID
+        .ifBlank { DefaultCastOptionsProvider.APP_ID_DEFAULT_RECEIVER_WITH_DRM }
 
     @Volatile private var availability: Boolean? = null
 
@@ -110,7 +114,13 @@ object CastSupport {
         if (!isAvailable(context)) return
         runCatching {
             val cast = Cast.getSingletonInstance(context.applicationContext)
-            if (cast.needsInitialization()) cast.initialize()
+            if (cast.needsInitialization()) {
+                cast.initialize(
+                    androidx.media3.cast.CastParams.Builder()
+                        .setReceiverApplicationId(RECEIVER_APP_ID)
+                        .build(),
+                )
+            }
         }.onFailure {
             TrackLog.d("BitChordCast", "cast initialisation failed: ${it.message}")
             availability = false

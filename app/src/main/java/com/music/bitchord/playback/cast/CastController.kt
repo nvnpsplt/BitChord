@@ -126,7 +126,41 @@ internal class CastController(
         override fun onCastSessionUnavailable() = stopCasting()
     }
 
+    /**
+     * The last few tracks' lyrics, as sent. Kept because the TV only shows the
+     * current track's, and a track reaches the TV after its lyrics were found:
+     * they are sent again whenever the receiver moves on to one of these.
+     */
+    private val lyricsMessages = object : LinkedHashMap<String, String>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 8
+    }
+
+    private val remoteTrackListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+            mediaItem?.mediaId?.let { lyricsMessages[it] }?.let { deliverLyrics(it) }
+        }
+    }
+
+    /**
+     * Hands [lines] for [mediaId] to BitChord's receiver, or remembers them for
+     * when that track reaches the TV. Does nothing on the stock receiver, which
+     * has no lyrics screen to show them on.
+     */
+    fun sendLyrics(mediaId: String, lines: List<com.music.bitchord.data.lyrics.LyricLine>?) {
+        if (!CastSupport.hasCustomReceiver) return
+        val message = CastLyrics.message(mediaId, lines)
+        lyricsMessages[mediaId] = message
+        deliverLyrics(message)
+    }
+
+    private fun deliverLyrics(message: String) {
+        if (!bridge.active) return
+        runCatching { cast.currentCastSession?.sendMessage(CastLyrics.NAMESPACE, message) }
+            .onFailure { TrackLog.d(TAG, "lyrics not sent: ${it.message}") }
+    }
+
     init {
+        remote.addListener(remoteTrackListener)
         cast.addSessionManagerListener(sessionListener)
         remote.setSessionAvailabilityListener(availabilityListener)
         if (remote.isCastSessionAvailable) startCasting()
@@ -145,6 +179,7 @@ internal class CastController(
         stopCasting(prepareLocal = false)
         cast.removeSessionManagerListener(sessionListener)
         remote.setSessionAvailabilityListener(null)
+        remote.removeListener(remoteTrackListener)
         bridge.releaseBridge()
         remote.release()
         // Nothing will be serving the receiver its audio once this process is
@@ -181,6 +216,7 @@ internal class CastController(
         bridge.activate(local)
         host.useSessionPlayer(bridge)
         host.onCastStarted()
+        local.currentMediaItem?.mediaId?.let { lyricsMessages[it] }?.let { deliverLyrics(it) }
         CastStatus.publish(CastStatus.Snapshot(CastStatus.Phase.CASTING, session?.deviceName()))
         TrackLog.d(TAG, "casting to ${session?.deviceName()} via $hostAddress:${server.port}")
     }

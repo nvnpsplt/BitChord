@@ -22,6 +22,7 @@ jobs:
       run: |
         echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" > local.properties
         echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> local.properties
+        echo "CAST_RECEIVER_APP_ID=${{ secrets.CAST_RECEIVER_APP_ID }}" >> local.properties
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -57,6 +58,7 @@ jobs:
       run: |
         echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" > local.properties
         echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> local.properties
+        echo "CAST_RECEIVER_APP_ID=${{ secrets.CAST_RECEIVER_APP_ID }}" >> local.properties
 
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > bitchord-release.jks
         echo "storeFile=bitchord-release.jks" > keystore.properties
