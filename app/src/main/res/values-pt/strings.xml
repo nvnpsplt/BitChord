@@ -1312,6 +1312,23 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Transmitir</string>
+    <string name="cast_searching">Procurando dispositivos no seu Wi-Fi…</string>
+    <string name="cast_none_found">Nenhum dispositivo encontrado</string>
+    <string name="cast_speaker_group">Grupo de alto-falantes</string>
+    <string name="cast_connecting">Conectando…</string>
+    <string name="cast_casting">Transmitindo</string>
+    <string name="cast_casting_to">Transmitindo para %1$s</string>
+    <string name="cast_stop">Parar transmissão</string>
+    <string name="cast_local_effects_note">Equalizador, crossfade, Automix e áudio espacial funcionam neste celular, então ficam pausados durante a transmissão.</string>
+    <string name="cast_blocked_party">A transmissão não está disponível durante o Listen Together</string>
+    <string name="cast_track_skipped">Uma música que o dispositivo não conseguiu tocar foi pulada</string>
+    <string name="cast_connect_failed">Não foi possível iniciar a transmissão. Verifique se o celular e o dispositivo estão no mesmo Wi-Fi.</string>
+    <string name="cast_feature_unavailable">Indisponível durante a transmissão</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Mostrar dispositivos Chromecast e Google Cast na escolha de saída</string>
+    <string name="cast_continue_title">Continuar tocando após transmitir</string>
+    <string name="cast_continue_subtitle">Quando uma transmissão terminar, continuar tocando neste celular</string>
 
 </resources>

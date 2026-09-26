@@ -1229,4 +1229,23 @@
     <string name="prioritize_spotify_canvas">Ưu tiên Spotify Canvas</string>
     <string name="prioritize_spotify_canvas_subtitle">Thử Spotify trước Apple Music và các nhà cung cấp ảnh bìa động khác</string>
 
+    <!-- Google Cast -->
+    <string name="cast_section_title">Truyền</string>
+    <string name="cast_searching">Đang tìm thiết bị trên Wi-Fi của bạn…</string>
+    <string name="cast_none_found">Không tìm thấy thiết bị truyền</string>
+    <string name="cast_speaker_group">Nhóm loa</string>
+    <string name="cast_connecting">Đang kết nối…</string>
+    <string name="cast_casting">Đang truyền</string>
+    <string name="cast_casting_to">Đang truyền tới %1$s</string>
+    <string name="cast_stop">Dừng truyền</string>
+    <string name="cast_local_effects_note">Bộ chỉnh âm, chuyển bài mượt, Automix và âm thanh không gian chạy trên điện thoại này nên sẽ tạm dừng khi truyền.</string>
+    <string name="cast_blocked_party">Không thể truyền khi đang dùng Listen Together</string>
+    <string name="cast_track_skipped">Đã bỏ qua một bài mà thiết bị không phát được</string>
+    <string name="cast_connect_failed">Không thể bắt đầu truyền. Hãy đảm bảo điện thoại và thiết bị dùng cùng một mạng Wi-Fi.</string>
+    <string name="cast_feature_unavailable">Không khả dụng khi đang truyền</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Hiển thị thiết bị Chromecast và Google Cast trong mục chọn đầu ra</string>
+    <string name="cast_continue_title">Tiếp tục phát sau khi truyền</string>
+    <string name="cast_continue_subtitle">Khi phiên truyền kết thúc, tiếp tục phát trên điện thoại này</string>
+
 </resources>

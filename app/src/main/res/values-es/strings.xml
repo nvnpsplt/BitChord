@@ -1279,6 +1279,23 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Enviar</string>
+    <string name="cast_searching">Buscando dispositivos en tu Wi-Fi…</string>
+    <string name="cast_none_found">No se encontraron dispositivos</string>
+    <string name="cast_speaker_group">Grupo de altavoces</string>
+    <string name="cast_connecting">Conectando…</string>
+    <string name="cast_casting">Enviando</string>
+    <string name="cast_casting_to">Enviando a %1$s</string>
+    <string name="cast_stop">Dejar de enviar</string>
+    <string name="cast_local_effects_note">El ecualizador, el fundido, Automix y el audio espacial funcionan en este teléfono, así que se pausan al enviar.</string>
+    <string name="cast_blocked_party">No se puede enviar durante Listen Together</string>
+    <string name="cast_track_skipped">Se omitió una canción que el dispositivo no pudo reproducir</string>
+    <string name="cast_connect_failed">No se pudo empezar a enviar. Comprueba que el teléfono y el dispositivo estén en la misma red Wi-Fi.</string>
+    <string name="cast_feature_unavailable">No disponible al enviar</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Mostrar dispositivos Chromecast y Google Cast en el selector de salida</string>
+    <string name="cast_continue_title">Seguir reproduciendo al dejar de enviar</string>
+    <string name="cast_continue_subtitle">Al terminar una sesión de envío, continuar en este teléfono</string>
 
 </resources>

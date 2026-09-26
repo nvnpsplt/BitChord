@@ -1144,4 +1144,23 @@
 
     <string name="card_songs_format">%1$s songs</string>
 
+    <!-- Google Cast -->
+    <string name="cast_section_title">Cast</string>
+    <string name="cast_searching">Looking for devices on your Wi-Fi…</string>
+    <string name="cast_none_found">No cast devices found</string>
+    <string name="cast_speaker_group">Speaker group</string>
+    <string name="cast_connecting">Connecting…</string>
+    <string name="cast_casting">Casting</string>
+    <string name="cast_casting_to">Casting to %1$s</string>
+    <string name="cast_stop">Stop casting</string>
+    <string name="cast_local_effects_note">Equalizer, crossfade, Automix and spatial audio run on this phone, so they pause while casting.</string>
+    <string name="cast_blocked_party">Casting isn\'t available during Listen Together</string>
+    <string name="cast_track_skipped">Skipped a track the cast device couldn\'t play</string>
+    <string name="cast_connect_failed">Couldn\'t start casting. Make sure this phone and the cast device are on the same Wi-Fi.</string>
+    <string name="cast_feature_unavailable">Not available while casting</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Show Chromecast and Google Cast devices in the output picker</string>
+    <string name="cast_continue_title">Keep playing after casting</string>
+    <string name="cast_continue_subtitle">When a cast session ends, carry on playing from this phone</string>
+
 </resources>

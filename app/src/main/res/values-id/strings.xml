@@ -1287,6 +1287,23 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Transmisikan</string>
+    <string name="cast_searching">Mencari perangkat di Wi-Fi Anda…</string>
+    <string name="cast_none_found">Tidak ada perangkat transmisi</string>
+    <string name="cast_speaker_group">Grup speaker</string>
+    <string name="cast_connecting">Menghubungkan…</string>
+    <string name="cast_casting">Mentransmisikan</string>
+    <string name="cast_casting_to">Mentransmisikan ke %1$s</string>
+    <string name="cast_stop">Hentikan transmisi</string>
+    <string name="cast_local_effects_note">Equalizer, crossfade, Automix, dan audio spasial berjalan di ponsel ini, jadi dijeda selama transmisi.</string>
+    <string name="cast_blocked_party">Transmisi tidak tersedia selama Listen Together</string>
+    <string name="cast_track_skipped">Melewati lagu yang tidak bisa diputar perangkat</string>
+    <string name="cast_connect_failed">Tidak dapat memulai transmisi. Pastikan ponsel dan perangkat terhubung ke Wi-Fi yang sama.</string>
+    <string name="cast_feature_unavailable">Tidak tersedia saat mentransmisikan</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Tampilkan perangkat Chromecast dan Google Cast di pemilih output</string>
+    <string name="cast_continue_title">Tetap putar setelah transmisi</string>
+    <string name="cast_continue_subtitle">Saat sesi transmisi berakhir, lanjutkan pemutaran dari ponsel ini</string>
 
 </resources>

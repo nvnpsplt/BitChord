@@ -54,6 +54,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.music.bitchord.R
 import com.music.bitchord.playback.AudioOutputStatus
 import com.music.bitchord.playback.AudioRouting
+import com.music.bitchord.playback.cast.CastStatus
+import com.music.bitchord.playback.cast.CastSupport
+import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.ui.haptics.Haptic
 import com.music.bitchord.ui.haptics.rememberHaptics
 import dev.chrisbanes.haze.HazeState
@@ -93,6 +96,10 @@ internal fun AudioOutputSheet(
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
     val outputs = rememberAudioOutputs()
+    val cast by CastStatus.current.collectAsStateWithLifecycle()
+    val castEnabled by AppSettings.castEnabled.collectAsStateWithLifecycle()
+    val castAvailable = remember(context) { CastSupport.isAvailable(context) }
+    val castDevices = rememberCastDevices(enabled = castAvailable && castEnabled)
 
     PlayerDrawer(
         hazeState = hazeState,
@@ -112,16 +119,28 @@ internal fun AudioOutputSheet(
                 OutputRow(
                     device = device,
                     accountName = accountName,
-                    onSelect = { AudioRouting.select(device.id) },
+                    // While a receiver is playing, none of the phone's own
+                    // outputs is the one in use — and picking one is how the
+                    // music comes back to the phone.
+                    active = device.isActive && !cast.isActive,
+                    onSelect = {
+                        if (cast.isActive) CastSupport.endSession(context)
+                        AudioRouting.select(device.id)
+                    },
                 )
+            }
+            if (castAvailable && castEnabled) {
+                CastDevicesSection(castDevices)
             }
         }
 
         Spacer(Modifier.height(10.dp))
-        VolumeRow(manager, routeKey = outputs)
+        if (cast.isCasting) CastVolumeRow() else VolumeRow(manager, routeKey = outputs)
 
         Spacer(Modifier.height(6.dp))
-        AudioPipelineRow(onClick = onOpenPipeline)
+        // The pipeline describes this phone's decoder and AudioTrack, neither
+        // of which is doing anything while a receiver plays.
+        if (cast.isActive) CastEffectsNote() else AudioPipelineRow(onClick = onOpenPipeline)
     }
 }
 
@@ -210,9 +229,9 @@ private fun OutputRow(
     device: AudioRouting.Device,
     accountName: String?,
     onSelect: () -> Unit,
+    active: Boolean = device.isActive,
 ) {
     val haptics = rememberHaptics()
-    val active = device.isActive
     Row(
         modifier = Modifier
             .fillMaxWidth()

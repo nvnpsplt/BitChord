@@ -293,6 +293,22 @@ object AppSettings {
     val automixPerformanceMode = MutableStateFlow(AutomixPerformanceMode.BALANCED)
     val skipSilence = MutableStateFlow(false)
 
+    /**
+     * Offer Google Cast devices — Chromecasts, Google TVs, Nest speakers — in
+     * the player's output sheet. On by default: nothing is searched for until
+     * the sheet is opened, and the section only appears where Google Play
+     * services can cast at all.
+     */
+    val castEnabled = MutableStateFlow(true)
+
+    /**
+     * When a cast session ends with music playing, carry on out of this phone.
+     * Off by default: a session usually ends because someone switched the TV
+     * off or walked out of the room, and a phone suddenly playing out loud in a
+     * pocket is the wrong answer to either.
+     */
+    val castContinueOnPhone = MutableStateFlow(false)
+
     /** Requested PCM representation at the Android AudioTrack boundary. */
     val outputPcmMode = MutableStateFlow(OutputPcmMode.PCM_16)
 
@@ -825,6 +841,8 @@ object AppSettings {
             )
         }.getOrDefault(AutomixPerformanceMode.BALANCED)
         skipSilence.value = prefs.getBoolean(KEY_SKIP_SILENCE, false)
+        castEnabled.value = prefs.getBoolean(KEY_CAST_ENABLED, true)
+        castContinueOnPhone.value = prefs.getBoolean(KEY_CAST_CONTINUE_ON_PHONE, false)
         outputPcmMode.value = runCatching {
             OutputPcmMode.valueOf(
                 prefs.getString(KEY_OUTPUT_PCM_MODE, OutputPcmMode.PCM_16.name)
@@ -1119,6 +1137,16 @@ object AppSettings {
     fun setSkipSilence(value: Boolean) {
         skipSilence.value = value
         prefs.edit().putBoolean(KEY_SKIP_SILENCE, value).apply()
+    }
+
+    fun setCastEnabled(value: Boolean) {
+        castEnabled.value = value
+        prefs.edit().putBoolean(KEY_CAST_ENABLED, value).apply()
+    }
+
+    fun setCastContinueOnPhone(value: Boolean) {
+        castContinueOnPhone.value = value
+        prefs.edit().putBoolean(KEY_CAST_CONTINUE_ON_PHONE, value).apply()
     }
 
     fun setDolbyAtmos(value: Boolean) {
@@ -1939,6 +1967,8 @@ object AppSettings {
     private const val KEY_SMART_FADE = "smart_fade_enabled"
     private const val KEY_AUTOMIX_PERFORMANCE_MODE = "automix_performance_mode"
     private const val KEY_SKIP_SILENCE = "skip_silence"
+    private const val KEY_CAST_ENABLED = "cast_enabled"
+    private const val KEY_CAST_CONTINUE_ON_PHONE = "cast_continue_on_phone"
     private const val KEY_OUTPUT_PCM_MODE = "output_pcm_mode"
     private const val KEY_PREFER_USB_DAC = "prefer_usb_dac"
     private const val KEY_LOUDNESS_NORMALIZATION = "loudness_normalization"

@@ -1312,6 +1312,23 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">העברה</string>
+    <string name="cast_searching">מחפש מכשירים ברשת ה-Wi-Fi…</string>
+    <string name="cast_none_found">לא נמצאו מכשירי העברה</string>
+    <string name="cast_speaker_group">קבוצת רמקולים</string>
+    <string name="cast_connecting">מתחבר…</string>
+    <string name="cast_casting">מעביר</string>
+    <string name="cast_casting_to">מעביר אל %1$s</string>
+    <string name="cast_stop">הפסק העברה</string>
+    <string name="cast_local_effects_note">האקולייזר, המעבר ההדרגתי, Automix והשמע המרחבי פועלים בטלפון הזה, ולכן מושהים בזמן העברה.</string>
+    <string name="cast_blocked_party">העברה אינה זמינה במהלך Listen Together</string>
+    <string name="cast_track_skipped">דולג שיר שהמכשיר לא הצליח לנגן</string>
+    <string name="cast_connect_failed">לא ניתן להתחיל העברה. ודא שהטלפון והמכשיר מחוברים לאותה רשת Wi-Fi.</string>
+    <string name="cast_feature_unavailable">לא זמין בזמן העברה</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">הצג מכשירי Chromecast ו-Google Cast בבחירת הפלט</string>
+    <string name="cast_continue_title">המשך לנגן אחרי ההעברה</string>
+    <string name="cast_continue_subtitle">כשהעברה מסתיימת, להמשיך לנגן מהטלפון הזה</string>
 
 </resources>

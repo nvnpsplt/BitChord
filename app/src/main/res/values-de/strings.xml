@@ -1307,6 +1307,23 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Streamen</string>
+    <string name="cast_searching">Suche nach Geräten im WLAN…</string>
+    <string name="cast_none_found">Keine Cast-Geräte gefunden</string>
+    <string name="cast_speaker_group">Lautsprechergruppe</string>
+    <string name="cast_connecting">Verbinde…</string>
+    <string name="cast_casting">Wird gestreamt</string>
+    <string name="cast_casting_to">Wird auf %1$s gestreamt</string>
+    <string name="cast_stop">Streamen beenden</string>
+    <string name="cast_local_effects_note">Equalizer, Überblendung, Automix und Raumklang laufen auf diesem Handy und pausieren daher beim Streamen.</string>
+    <string name="cast_blocked_party">Streamen ist während Listen Together nicht verfügbar</string>
+    <string name="cast_track_skipped">Titel übersprungen, den das Gerät nicht abspielen konnte</string>
+    <string name="cast_connect_failed">Streamen konnte nicht gestartet werden. Handy und Gerät müssen im selben WLAN sein.</string>
+    <string name="cast_feature_unavailable">Beim Streamen nicht verfügbar</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Chromecast- und Google-Cast-Geräte in der Ausgabeauswahl anzeigen</string>
+    <string name="cast_continue_title">Nach dem Streamen weiterspielen</string>
+    <string name="cast_continue_subtitle">Nach dem Ende einer Cast-Sitzung auf diesem Handy weiterspielen</string>
 
 </resources>

@@ -53,6 +53,18 @@ val listenTogetherServer: String = (
     ).trim().trimEnd('/')
 
 /*
+ * The Google Cast receiver app to launch on the TV: BitChord's own page in
+ * docs/cast-receiver, registered in the Cast SDK Developer Console. Empty is a
+ * supported state — casting then uses Media3's stock receiver, which plays
+ * everything but shows no lyrics and no BitChord branding.
+ */
+val castReceiverAppId: String = (
+    localProps.getProperty("CAST_RECEIVER_APP_ID")
+        ?: System.getenv("CAST_RECEIVER_APP_ID")
+        ?: ""
+    ).trim()
+
+/*
  * Bump this by hand before cutting each sideloaded test build ("beta2",
  * "beta3", ...) and blank it out before cutting the real release. Marks the
  * versionName below as a pre-release: AppUpdateChecker.isNewer() treats any
@@ -92,6 +104,11 @@ android {
             "String",
             "LISTEN_TOGETHER_SERVER",
             "\"${listenTogetherServer.replace("\\", "\\\\").replace("\"", "\\\"")}\"",
+        )
+        buildConfigField(
+            "String",
+            "CAST_RECEIVER_APP_ID",
+            "\"${castReceiverAppId.filter { it.isLetterOrDigit() }}\"",
         )
     }
 

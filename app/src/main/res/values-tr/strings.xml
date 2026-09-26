@@ -1262,6 +1262,23 @@
 
     <string name="this_phone">This phone</string>
 
-
+    <!-- Google Cast -->
+    <string name="cast_section_title">Yayınla</string>
+    <string name="cast_searching">Wi-Fi ağınızda cihaz aranıyor…</string>
+    <string name="cast_none_found">Yayın cihazı bulunamadı</string>
+    <string name="cast_speaker_group">Hoparlör grubu</string>
+    <string name="cast_connecting">Bağlanıyor…</string>
+    <string name="cast_casting">Yayınlanıyor</string>
+    <string name="cast_casting_to">%1$s cihazına yayınlanıyor</string>
+    <string name="cast_stop">Yayını durdur</string>
+    <string name="cast_local_effects_note">Ekolayzır, geçiş efekti, Automix ve uzamsal ses bu telefonda çalıştığı için yayın sırasında duraklatılır.</string>
+    <string name="cast_blocked_party">Listen Together sırasında yayın kullanılamaz</string>
+    <string name="cast_track_skipped">Cihazın çalamadığı bir şarkı atlandı</string>
+    <string name="cast_connect_failed">Yayın başlatılamadı. Telefonun ve cihazın aynı Wi-Fi ağında olduğundan emin olun.</string>
+    <string name="cast_feature_unavailable">Yayın sırasında kullanılamaz</string>
+    <string name="cast_setting_title">Google Cast</string>
+    <string name="cast_setting_subtitle">Çıkış seçicide Chromecast ve Google Cast cihazlarını göster</string>
+    <string name="cast_continue_title">Yayından sonra çalmaya devam et</string>
+    <string name="cast_continue_subtitle">Yayın oturumu bittiğinde bu telefondan çalmaya devam et</string>
 
 </resources>
