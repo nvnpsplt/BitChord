@@ -1298,6 +1298,7 @@
     <string name="cast_section_title">แคสต์</string>
     <string name="cast_searching">กำลังค้นหาอุปกรณ์ใน Wi-Fi ของคุณ…</string>
     <string name="cast_none_found">ไม่พบอุปกรณ์แคสต์</string>
+    <string name="cast_speaker_group">กลุ่มลำโพง</string>
     <string name="cast_connecting">กำลังเชื่อมต่อ…</string>
     <string name="cast_casting">กำลังแคสต์</string>
     <string name="cast_casting_to">กำลังแคสต์ไปยัง %1$s</string>

@@ -2,6 +2,7 @@ package com.music.bitchord.playback.cast
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
@@ -148,6 +149,47 @@ class CastProtocolTest {
         assertNull(next.contentId)
         assertNull(next.durationMs)
         assertEquals("ERROR", next.idleReason)
+    }
+
+    @Test
+    fun mediaStatus_tracksTheQueue() {
+        val first = CastProtocol.parseMediaStatus(
+            json(
+                """{"type":"MEDIA_STATUS","status":[{"mediaSessionId":2,"playerState":"PLAYING","currentTime":200,
+                   "currentItemId":1,"items":[{"itemId":1},{"itemId":2}],
+                   "media":{"contentId":"http://p/a/1","duration":210}}]}""",
+            ),
+            previous = null,
+        )!!
+        assertEquals(1, first.currentItemId)
+        assertEquals(listOf(1, 2), first.itemIds)
+
+        // The receiver ran into the queued track: same session, new item.
+        val next = CastProtocol.parseMediaStatus(
+            json(
+                """{"type":"MEDIA_STATUS","status":[{"mediaSessionId":2,"playerState":"BUFFERING","currentTime":0,
+                   "currentItemId":2,"media":{"contentId":"http://p/a/2"}}]}""",
+            ),
+            previous = first,
+        )!!
+        assertEquals("http://p/a/2", next.contentId)
+        assertEquals(2, next.currentItemId)
+        assertEquals(listOf(1, 2), next.itemIds)
+        // The previous track's duration is not carried onto this one.
+        assertNull(next.durationMs)
+    }
+
+    @Test
+    fun queueCommands_areWellFormed() {
+        val request = CastProtocol.LoadRequest("http://p/a/2", "audio/webm", "id2", "T", null, null, null, 0, true)
+        val insert = json(CastProtocol.queueInsert(3, 2, request, 20))
+        assertEquals("QUEUE_INSERT", insert["type"]!!.jsonPrimitive.content)
+        val item = insert["items"]!!.jsonArray.single().jsonObject
+        assertEquals("20", item["preloadTime"]!!.jsonPrimitive.content)
+        assertEquals("http://p/a/2", item["media"]!!.jsonObject["contentId"]!!.jsonPrimitive.content)
+        val remove = json(CastProtocol.queueRemove(4, 2, listOf(5, 6)))
+        assertEquals(listOf("5", "6"), remove["itemIds"]!!.jsonArray.map { it.jsonPrimitive.content })
+        assertEquals("1", json(CastProtocol.queueJump(5, 2, 1))["jump"]!!.jsonPrimitive.content)
     }
 
     @Test

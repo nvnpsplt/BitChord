@@ -1283,6 +1283,7 @@
     <string name="cast_section_title">Enviar</string>
     <string name="cast_searching">Buscando dispositivos en tu Wi-Fi…</string>
     <string name="cast_none_found">No se encontraron dispositivos</string>
+    <string name="cast_speaker_group">Grupo de altavoces</string>
     <string name="cast_connecting">Conectando…</string>
     <string name="cast_casting">Enviando</string>
     <string name="cast_casting_to">Enviando a %1$s</string>

@@ -71,6 +71,10 @@ internal class CastSession(
         private set
     private var mediaStatusAt = 0L
 
+    /** The receiver's queue, in order. Main thread. */
+    var queueItemIds: List<Int> = emptyList()
+        private set
+
     var volumeLevel: Double = 1.0
         private set
     var muted: Boolean = false
@@ -98,6 +102,38 @@ internal class CastSession(
     fun load(request: CastProtocol.LoadRequest) {
         val running = app ?: return
         send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.load(nextId(), running.sessionId, request))
+    }
+
+    /** Queues [request] after the current track, preloaded ahead of the handover. */
+    fun queueNext(request: CastProtocol.LoadRequest) {
+        val running = app ?: return
+        val session = mediaStatus?.mediaSessionId ?: return
+        send(
+            CastProtocol.NS_MEDIA,
+            running.transportId,
+            CastProtocol.queueInsert(nextId(), session, request, PRELOAD_SECONDS),
+        )
+        requestQueueItemIds()
+    }
+
+    private fun requestQueueItemIds() {
+        val running = app ?: return
+        val session = mediaStatus?.mediaSessionId ?: return
+        send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.queueGetItemIds(nextId(), session))
+    }
+
+    fun queueRemove(itemIds: List<Int>) {
+        if (itemIds.isEmpty()) return
+        val running = app ?: return
+        val session = mediaStatus?.mediaSessionId ?: return
+        send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.queueRemove(nextId(), session, itemIds))
+    }
+
+    /** Skips to the next queued track, which the receiver has already preloaded. */
+    fun queueSkip() {
+        val running = app ?: return
+        val session = mediaStatus?.mediaSessionId ?: return
+        send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.queueJump(nextId(), session, 1))
     }
 
     fun play() = mediaCommand("PLAY")
@@ -317,10 +353,21 @@ internal class CastSession(
     private fun onMediaMessage(payload: JsonObject) {
         when (CastProtocol.type(payload)) {
             "MEDIA_STATUS" -> {
+                val previousSession = mediaStatus?.mediaSessionId
                 mediaStatus = CastProtocol.parseMediaStatus(payload, mediaStatus)
                 mediaStatusAt = SystemClock.elapsedRealtime()
+                val status = mediaStatus
+                when {
+                    status == null -> queueItemIds = emptyList()
+                    status.mediaSessionId != previousSession -> queueItemIds = status.itemIds
+                    (payload["status"] as? kotlinx.serialization.json.JsonArray)?.firstOrNull()
+                        ?.let { it as? JsonObject }?.containsKey("items") == true -> queueItemIds = status.itemIds
+                }
                 listener.onMediaStatus(mediaStatus)
             }
+            // The queue changed shape; its status may not list the items, so ask.
+            "QUEUE_CHANGE" -> requestQueueItemIds()
+            "QUEUE_ITEM_IDS" -> queueItemIds = CastProtocol.parseItemIds(payload)
             "LOAD_FAILED", "LOAD_CANCELLED", "INVALID_REQUEST", "INVALID_PLAYER_STATE" ->
                 listener.onLoadFailed(CastProtocol.type(payload).orEmpty())
         }
@@ -386,5 +433,8 @@ internal class CastSession(
         const val HEARTBEAT_MS = 5_000L
         const val DEAD_AFTER_MS = 20_000L
         const val AUTH_TIMEOUT_MS = 8_000L
+
+        /** How long before a track ends the receiver starts fetching the next one. */
+        const val PRELOAD_SECONDS = 20
     }
 }

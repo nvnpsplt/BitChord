@@ -1337,6 +1337,7 @@
     <string name="cast_section_title">Трансляция</string>
     <string name="cast_searching">Поиск устройств в вашей сети Wi-Fi…</string>
     <string name="cast_none_found">Устройства не найдены</string>
+    <string name="cast_speaker_group">Группа динамиков</string>
     <string name="cast_connecting">Подключение…</string>
     <string name="cast_casting">Идёт трансляция</string>
     <string name="cast_casting_to">Трансляция на %1$s</string>

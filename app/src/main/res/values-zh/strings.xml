@@ -1291,6 +1291,7 @@
     <string name="cast_section_title">投放</string>
     <string name="cast_searching">正在搜索 Wi-Fi 上的设备…</string>
     <string name="cast_none_found">未找到投放设备</string>
+    <string name="cast_speaker_group">音箱组</string>
     <string name="cast_connecting">正在连接…</string>
     <string name="cast_casting">正在投放</string>
     <string name="cast_casting_to">正在投放到 %1$s</string>
