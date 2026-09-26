@@ -1,6 +1,8 @@
 package com.music.bitchord.playback.cast
 
+import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import com.music.bitchord.data.lyrics.LyricLine
 
 /** What the cast controller needs from the playback service — see [CastController]. */
 internal interface CastHost {
@@ -22,4 +24,10 @@ internal interface CastHost {
     fun onRemoteIsPlayingChanged(isPlaying: Boolean)
     fun onRemoteAdvance(advance: () -> Unit)
     fun onRemoteQueueEnded()
+
+    /**
+     * [item]'s synced lyrics, looked up the way the lyrics screen does. Blocks,
+     * bounded by a timeout; called off the main thread. Null when there are none.
+     */
+    fun lyricsFor(item: MediaItem): List<LyricLine>?
 }

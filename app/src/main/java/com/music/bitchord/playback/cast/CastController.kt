@@ -30,7 +30,7 @@ internal class CastController(
 
     private val appContext = context.applicationContext
     private val server = CastMediaServer(appContext, dataSourceFactory)
-    private var session: CastSession? = null
+    private var session: RemoteSession? = null
     private var device: CastDevice? = null
     private var hostAddress: String? = null
 
@@ -72,8 +72,21 @@ internal class CastController(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 8
     }
 
+    /**
+     * The last few tracks' lyrics as found for the phone's own lyrics screen,
+     * so captions for the current track need no second lookup. Read from the
+     * media server's threads, hence the lock.
+     */
+    private val captionLines = object : LinkedHashMap<String, List<LyricLine>>(8, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<LyricLine>>?): Boolean = size > 8
+    }
+
     init {
         CastConnector.controller = this
+        server.captions = { item ->
+            val lines = synchronized(captionLines) { captionLines[item.mediaId] } ?: host.lyricsFor(item)
+            CastCaptions.webVtt(lines.orEmpty().map { CastCaptions.Line(it.timeMs, it.text, it.sungUntilMs) })
+        }
     }
 
     /** Connects to [target] and, once its receiver is up, moves playback there. */
@@ -95,7 +108,12 @@ internal class CastController(
         }
         device = target
         CastStatus.publish(CastStatus.Snapshot(CastStatus.Phase.CONNECTING, target.name, target.id))
-        val newSession = CastSession(target.host, target.port, CastSupport.RECEIVER_APP_ID, SessionEvents())
+        val renderer = target.dlna
+        val newSession: RemoteSession = if (renderer != null) {
+            DlnaSession(renderer, SessionEvents())
+        } else {
+            CastSession(target.host, target.port, CastSupport.RECEIVER_APP_ID, SessionEvents())
+        }
         session = newSession
         newSession.open()
     }
@@ -121,9 +139,11 @@ internal class CastController(
     /**
      * Hands [lines] for [mediaId] to BitChord's receiver, or remembers them for
      * when that track reaches the TV. Does nothing on the stock receiver, which
-     * has no lyrics screen to show them on.
+     * has no lyrics screen — there they may become subtitles instead, see
+     * [CastCaptions].
      */
     fun sendLyrics(mediaId: String, lines: List<LyricLine>?) {
+        if (lines != null) synchronized(captionLines) { captionLines[mediaId] = lines }
         if (!CastSupport.hasCustomReceiver) return
         val message = CastLyrics.message(mediaId, lines)
         lyricsMessages[mediaId] = message
@@ -143,7 +163,7 @@ internal class CastController(
         session?.sendCustom(CastLyrics.NAMESPACE, message)
     }
 
-    private inner class SessionEvents : CastSession.Listener {
+    private inner class SessionEvents : RemoteSession.Listener {
         private fun isCurrent(): Boolean = session != null
 
         override fun onReady() {

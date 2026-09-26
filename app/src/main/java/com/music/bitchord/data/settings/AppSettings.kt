@@ -309,6 +309,20 @@ object AppSettings {
      */
     val castContinueOnPhone = MutableStateFlow(false)
 
+    /**
+     * Experimental: synced lyrics shown as subtitles on the TV by Google's
+     * Default Media Receiver. Off by default — the receiver's own subtitle
+     * styling is all there is, and it covers the bottom of the artwork.
+     */
+    val castLyricsCaptions = MutableStateFlow(false)
+
+    /**
+     * Experimental: also list DLNA / UPnP renderers (non-Cast TVs, AV
+     * receivers, speakers) in the output sheet. Off by default — many can't
+     * decode YouTube's Opus streams, so only some tracks play on them.
+     */
+    val castDlna = MutableStateFlow(false)
+
     /** Requested PCM representation at the Android AudioTrack boundary. */
     val outputPcmMode = MutableStateFlow(OutputPcmMode.PCM_16)
 
@@ -843,6 +857,8 @@ object AppSettings {
         skipSilence.value = prefs.getBoolean(KEY_SKIP_SILENCE, false)
         castEnabled.value = prefs.getBoolean(KEY_CAST_ENABLED, true)
         castContinueOnPhone.value = prefs.getBoolean(KEY_CAST_CONTINUE_ON_PHONE, false)
+        castLyricsCaptions.value = prefs.getBoolean(KEY_CAST_LYRICS_CAPTIONS, false)
+        castDlna.value = prefs.getBoolean(KEY_CAST_DLNA, false)
         outputPcmMode.value = runCatching {
             OutputPcmMode.valueOf(
                 prefs.getString(KEY_OUTPUT_PCM_MODE, OutputPcmMode.PCM_16.name)
@@ -1147,6 +1163,16 @@ object AppSettings {
     fun setCastContinueOnPhone(value: Boolean) {
         castContinueOnPhone.value = value
         prefs.edit().putBoolean(KEY_CAST_CONTINUE_ON_PHONE, value).apply()
+    }
+
+    fun setCastDlna(value: Boolean) {
+        castDlna.value = value
+        prefs.edit().putBoolean(KEY_CAST_DLNA, value).apply()
+    }
+
+    fun setCastLyricsCaptions(value: Boolean) {
+        castLyricsCaptions.value = value
+        prefs.edit().putBoolean(KEY_CAST_LYRICS_CAPTIONS, value).apply()
     }
 
     fun setDolbyAtmos(value: Boolean) {
@@ -1969,6 +1995,8 @@ object AppSettings {
     private const val KEY_SKIP_SILENCE = "skip_silence"
     private const val KEY_CAST_ENABLED = "cast_enabled"
     private const val KEY_CAST_CONTINUE_ON_PHONE = "cast_continue_on_phone"
+    private const val KEY_CAST_LYRICS_CAPTIONS = "cast_lyrics_captions"
+    private const val KEY_CAST_DLNA = "cast_dlna"
     private const val KEY_OUTPUT_PCM_MODE = "output_pcm_mode"
     private const val KEY_PREFER_USB_DAC = "prefer_usb_dac"
     private const val KEY_LOUDNESS_NORMALIZATION = "loudness_normalization"

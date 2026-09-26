@@ -55,12 +55,20 @@ jobs:
         cache: gradle
 
     - name: Setup Secrets (Keystore & local.properties)
+      env:
+        KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
       run: |
         echo "LASTFM_API_KEY=${{ secrets.LASTFM_API_KEY }}" > local.properties
         echo "LASTFM_SECRET=${{ secrets.LASTFM_SECRET }}" >> local.properties
         echo "CAST_RECEIVER_APP_ID=${{ secrets.CAST_RECEIVER_APP_ID }}" >> local.properties
 
-        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > bitchord-release.jks
+        # Without a keystore (a fork, say) the release is built unsigned
+        # rather than failing: an empty keystore file would fail signing.
+        if [ -z "$KEYSTORE_BASE64" ]; then
+          echo "::warning::No KEYSTORE_BASE64 secret: building an unsigned release APK"
+          exit 0
+        fi
+        echo "$KEYSTORE_BASE64" | base64 -d > bitchord-release.jks
         echo "storeFile=bitchord-release.jks" > keystore.properties
         echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> keystore.properties
         echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> keystore.properties
@@ -75,5 +83,5 @@ jobs:
     - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: bitchord-prod-release-signed
+        name: bitchord-prod-release
         path: app/build/outputs/apk/prod/release/*.apk

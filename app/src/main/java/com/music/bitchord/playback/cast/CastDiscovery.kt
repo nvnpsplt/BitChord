@@ -7,6 +7,7 @@ import android.os.Handler
 import android.os.Looper
 import android.net.wifi.WifiManager
 import com.music.bitchord.data.TrackLog
+import com.music.bitchord.data.settings.AppSettings
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
@@ -26,6 +27,8 @@ data class CastDevice(
     val port: Int,
     val hasScreen: Boolean,
     val isGroup: Boolean,
+    /** Set for a DLNA / UPnP renderer rather than a Cast device. */
+    val dlna: DlnaRenderer? = null,
 )
 
 /**
@@ -52,6 +55,7 @@ object CastDiscovery {
 
     private var users = 0
     private var raw: RawBrowser? = null
+    private var ssdp: SsdpBrowser? = null
     private var manager: NsdManager? = null
     private var listener: NsdManager.DiscoveryListener? = null
     private val byServiceName = LinkedHashMap<String, CastDevice>()
@@ -79,6 +83,7 @@ object CastDiscovery {
 
     private fun begin(context: Context) {
         raw = RawBrowser(context).also { it.start() }
+        if (AppSettings.castDlna.value) ssdp = SsdpBrowser(context).also { it.start() }
         val nsd = context.getSystemService(Context.NSD_SERVICE) as? NsdManager ?: return
         manager = nsd
         val discovery = object : NsdManager.DiscoveryListener {
@@ -109,6 +114,8 @@ object CastDiscovery {
     private fun end() {
         raw?.stop()
         raw = null
+        ssdp?.stop()
+        ssdp = null
         val nsd = manager
         val discovery = listener
         if (nsd != null && discovery != null) runCatching { nsd.stopServiceDiscovery(discovery) }
@@ -170,7 +177,148 @@ object CastDiscovery {
     }
 
     private fun publish() {
-        found.value = byServiceName.values.distinctBy { it.id }.sortedBy { it.name.lowercase() }
+        val dlnaOn = AppSettings.castDlna.value
+        found.value = byServiceName.values
+            .filter { dlnaOn || it.dlna == null }
+            .distinctBy { it.id }
+            .sortedBy { it.name.lowercase() }
+    }
+
+    /** A renderer seen by [SsdpBrowser]; main thread. */
+    private fun onRenderer(renderer: DlnaRenderer) {
+        val host = runCatching { java.net.URI(renderer.location).host }.getOrNull() ?: return
+        val port = runCatching { java.net.URI(renderer.location).port }.getOrDefault(-1)
+        val device = CastDevice(
+            id = "dlna:" + renderer.udn,
+            name = renderer.friendlyName,
+            host = host,
+            port = port,
+            // UPnP says nothing about a screen; TVs almost always say so in their name.
+            hasScreen = Regex("\\b(tv|television|bravia|viera|aquos)\\b", RegexOption.IGNORE_CASE)
+                .containsMatchIn(renderer.friendlyName),
+            isGroup = false,
+            dlna = renderer,
+        )
+        val key = "dlna:" + renderer.udn
+        if (byServiceName[key] != device) {
+            byServiceName[key] = device
+            publish()
+        }
+    }
+
+    private fun onRendererGone(usn: String?) {
+        val udn = usn?.substringBefore("::") ?: return
+        if (byServiceName.remove("dlna:$udn") != null) publish()
+    }
+
+    /**
+     * Finds DLNA / UPnP media renderers: an SSDP search on the multicast group
+     * every few seconds, answered straight back to our socket, then each new
+     * renderer's description fetched for its name and control URLs.
+     */
+    private class SsdpBrowser(context: Context) {
+        private val wifi = context.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+        private var lock: WifiManager.MulticastLock? = null
+        @Volatile private var running = false
+        private var socket: DatagramSocket? = null
+        private val described = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+        fun start() {
+            running = true
+            lock = runCatching {
+                wifi?.createMulticastLock("BitChord:dlna-discovery")?.apply {
+                    setReferenceCounted(false)
+                    acquire()
+                }
+            }.getOrNull()
+            Thread({ run() }, "dlna-ssdp").apply { isDaemon = true }.start()
+        }
+
+        fun stop() {
+            running = false
+            runCatching { socket?.close() }
+            runCatching { lock?.takeIf { it.isHeld }?.release() }
+            lock = null
+        }
+
+        private fun run() {
+            val group = runCatching { InetAddress.getByName(Dlna.SSDP_GROUP) }.getOrNull() ?: return
+            val search = Dlna.mSearch()
+            val direct = runCatching { DatagramSocket().apply { soTimeout = RECEIVE_TIMEOUT_MS } }
+                .onFailure { TrackLog.d(TAG, "SSDP socket unavailable: ${it.message}") }
+                .getOrNull() ?: return
+            socket = direct
+            var lastQuery = 0L
+            val buffer = ByteArray(4096)
+            while (running) {
+                val now = System.currentTimeMillis()
+                if (now - lastQuery >= QUERY_INTERVAL_MS) {
+                    lastQuery = now
+                    runCatching { direct.send(DatagramPacket(search, search.size, group, Dlna.SSDP_PORT)) }
+                }
+                try {
+                    val packet = DatagramPacket(buffer, buffer.size)
+                    direct.receive(packet)
+                    val text = String(packet.data, 0, packet.length, Charsets.UTF_8)
+                    val announcement = Dlna.parseAnnouncement(text) ?: continue
+                    if (!announcement.alive) {
+                        main.post { onRendererGone(announcement.usn) }
+                        continue
+                    }
+                    // Only the device that answered is asked for its description.
+                    val locationHost = runCatching { java.net.URI(announcement.location).host }.getOrNull()
+                    if (locationHost == null || InetAddress.getByName(locationHost) != packet.address) continue
+                    val seen = described[announcement.location]
+                    if (seen != null && now - seen < REDESCRIBE_MS) continue
+                    described[announcement.location] = now
+                    describe(announcement.location)
+                } catch (_: SocketTimeoutException) {
+                    // Nothing this round; ask again.
+                } catch (e: Exception) {
+                    if (running) TrackLog.d(TAG, "SSDP receive failed: ${e.message}")
+                    if (direct.isClosed) running = false
+                }
+            }
+        }
+
+        private fun describe(location: String) {
+            Thread({
+                val renderer = runCatching {
+                    val url = java.net.URL(location)
+                    if (url.protocol != "http") return@runCatching null
+                    val connection = url.openConnection() as java.net.HttpURLConnection
+                    try {
+                        connection.connectTimeout = DESCRIBE_TIMEOUT_MS
+                        connection.readTimeout = DESCRIBE_TIMEOUT_MS
+                        if (connection.responseCode != 200) return@runCatching null
+                        val bytes = connection.inputStream.use { it.readNBytesCompat(MAX_DESCRIPTION_BYTES) }
+                        Dlna.parseDescription(bytes, location)
+                    } finally {
+                        connection.disconnect()
+                    }
+                }.getOrNull()
+                if (renderer != null) main.post { onRenderer(renderer) }
+            }, "dlna-describe").apply { isDaemon = true }.start()
+        }
+
+        private fun java.io.InputStream.readNBytesCompat(limit: Int): ByteArray {
+            val out = java.io.ByteArrayOutputStream()
+            val chunk = ByteArray(8192)
+            while (out.size() < limit) {
+                val read = read(chunk, 0, minOf(chunk.size, limit - out.size()))
+                if (read < 0) break
+                out.write(chunk, 0, read)
+            }
+            return out.toByteArray()
+        }
+
+        private companion object {
+            const val QUERY_INTERVAL_MS = 5_000L
+            const val RECEIVE_TIMEOUT_MS = 1_000
+            const val REDESCRIBE_MS = 60_000L
+            const val DESCRIBE_TIMEOUT_MS = 3_000
+            const val MAX_DESCRIPTION_BYTES = 256 * 1024
+        }
     }
 
     /** A device seen by [RawBrowser]; main thread. */

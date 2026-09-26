@@ -46,6 +46,9 @@ internal object CastProtocol {
     /** Largest message the protocol allows; a longer length prefix means a broken stream. */
     const val MAX_MESSAGE_BYTES = 64 * 1024
 
+    /** The one text track a load carries: the lyrics, as subtitles. */
+    const val CAPTIONS_TRACK_ID = 1
+
     /**
      * One protocol envelope. Everything is a JSON string except device
      * authentication, which carries a protobuf in [payloadBinary].
@@ -232,6 +235,8 @@ internal object CastProtocol {
         val artworkUrl: String?,
         val startPositionMs: Long,
         val autoplay: Boolean,
+        /** A WebVTT file of the track's synced lyrics, shown as subtitles; see [CastCaptions]. */
+        val captionsUrl: String? = null,
     )
 
     fun load(requestId: Int, sessionId: String, request: LoadRequest): String = buildJsonObject {
@@ -241,6 +246,7 @@ internal object CastProtocol {
         put("autoplay", request.autoplay)
         put("currentTime", request.startPositionMs / 1000.0)
         put("media", media(request))
+        if (request.captionsUrl != null) put("activeTrackIds", activeCaptions())
     }.toString()
 
     /**
@@ -261,6 +267,7 @@ internal object CastProtocol {
                             put("autoplay", true)
                             put("startTime", 0)
                             put("preloadTime", preloadSeconds)
+                            if (request.captionsUrl != null) put("activeTrackIds", activeCaptions())
                         },
                     )
                 },
@@ -315,8 +322,39 @@ internal object CastProtocol {
                 }
             },
         )
+        request.captionsUrl?.let { url ->
+            put(
+                "tracks",
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("trackId", CAPTIONS_TRACK_ID)
+                            put("type", "TEXT")
+                            put("subtype", "SUBTITLES")
+                            put("trackContentId", url)
+                            put("trackContentType", "text/vtt")
+                            put("name", "Lyrics")
+                        },
+                    )
+                },
+            )
+            // Large and centred low on the screen, on a translucent band so a
+            // line stays readable over any artwork.
+            put(
+                "textTrackStyle",
+                buildJsonObject {
+                    put("fontScale", 1.4)
+                    put("foregroundColor", "#FFFFFFFF")
+                    put("backgroundColor", "#00000099")
+                    put("edgeType", "DROP_SHADOW")
+                    put("edgeColor", "#000000FF")
+                },
+            )
+        }
         put("customData", buildJsonObject { put("mediaId", request.mediaId) })
     }
+
+    private fun activeCaptions(): JsonArray = buildJsonArray { add(JsonPrimitive(CAPTIONS_TRACK_ID)) }
 
     /** PLAY, PAUSE and STOP — the media commands that carry nothing but the session. */
     fun mediaCommand(type: String, requestId: Int, mediaSessionId: Int): String = buildJsonObject {

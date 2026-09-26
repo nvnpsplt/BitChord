@@ -1247,5 +1247,9 @@
     <string name="cast_setting_subtitle">Hiển thị thiết bị Chromecast và Google Cast trong mục chọn đầu ra</string>
     <string name="cast_continue_title">Tiếp tục phát sau khi truyền</string>
     <string name="cast_continue_subtitle">Khi phiên truyền kết thúc, tiếp tục phát trên điện thoại này</string>
+    <string name="cast_captions_title">Lời bài hát trên TV (thử nghiệm)</string>
+    <string name="cast_captions_subtitle">Hiển thị lời bài hát đồng bộ dưới dạng phụ đề trên bộ thu của Google</string>
+    <string name="cast_dlna_title">Thiết bị DLNA (thử nghiệm)</string>
+    <string name="cast_dlna_subtitle">Hiển thị cả TV và loa DLNA/UPnP. Một số thiết bị không phát được mọi bài</string>
 
 </resources>

@@ -1330,5 +1330,9 @@
     <string name="cast_setting_subtitle">Mostrar dispositivos Chromecast e Google Cast na escolha de saída</string>
     <string name="cast_continue_title">Continuar tocando após transmitir</string>
     <string name="cast_continue_subtitle">Quando uma transmissão terminar, continuar tocando neste celular</string>
+    <string name="cast_captions_title">Letras na TV (experimental)</string>
+    <string name="cast_captions_subtitle">Mostrar letras sincronizadas como legendas no receptor do Google</string>
+    <string name="cast_dlna_title">Dispositivos DLNA (experimental)</string>
+    <string name="cast_dlna_subtitle">Mostrar também TVs e alto-falantes DLNA/UPnP. Alguns não tocam todas as faixas</string>
 
 </resources>

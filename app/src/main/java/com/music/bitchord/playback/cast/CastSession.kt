@@ -36,17 +36,11 @@ internal class CastSession(
     private val host: String,
     private val port: Int,
     private val appId: String,
-    private val listener: Listener,
-) {
+    private val listener: RemoteSession.Listener,
+) : RemoteSession {
 
-    interface Listener {
-        fun onReady()
-        fun onMediaStatus(status: CastProtocol.MediaStatus?)
-        fun onVolume(level: Double, muted: Boolean)
-        fun onLoadFailed(reason: String)
-        fun onCustomMessage(namespace: String, payload: String) = Unit
-        fun onClosed(error: String?)
-    }
+    override val supportsQueue: Boolean get() = true
+    override val supportsCustomMessages: Boolean get() = true
 
     private val main = Handler(Looper.getMainLooper())
     private val requestIds = AtomicInteger(1)
@@ -67,27 +61,27 @@ internal class CastSession(
     private var readyReported = false
 
     /** The latest media status, and when it arrived, for extrapolating the playhead. Main thread. */
-    var mediaStatus: CastProtocol.MediaStatus? = null
+    override var mediaStatus: CastProtocol.MediaStatus? = null
         private set
     private var mediaStatusAt = 0L
 
     /** The receiver's queue, in order. Main thread. */
-    var queueItemIds: List<Int> = emptyList()
+    override var queueItemIds: List<Int> = emptyList()
         private set
 
-    var volumeLevel: Double = 1.0
+    override var volumeLevel: Double = 1.0
         private set
-    var muted: Boolean = false
+    override var muted: Boolean = false
         private set
 
-    val isReady: Boolean get() = readyReported && !closed
+    override val isReady: Boolean get() = readyReported && !closed
 
-    fun open() {
+    override fun open() {
         Thread({ run() }, "cast-session").apply { isDaemon = true }.start()
     }
 
     /** Ends the session. [stopApp] also closes the receiver app on the TV. */
-    fun close(stopApp: Boolean) {
+    override fun close(stopApp: Boolean) {
         if (closed) return
         val running = app
         if (stopApp && running != null) {
@@ -99,13 +93,13 @@ internal class CastSession(
 
     // --- Commands (main thread) ----------------------------------------------
 
-    fun load(request: CastProtocol.LoadRequest) {
+    override fun load(request: CastProtocol.LoadRequest) {
         val running = app ?: return
         send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.load(nextId(), running.sessionId, request))
     }
 
     /** Queues [request] after the current track, preloaded ahead of the handover. */
-    fun queueNext(request: CastProtocol.LoadRequest) {
+    override fun queueNext(request: CastProtocol.LoadRequest) {
         val running = app ?: return
         val session = mediaStatus?.mediaSessionId ?: return
         send(
@@ -122,7 +116,7 @@ internal class CastSession(
         send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.queueGetItemIds(nextId(), session))
     }
 
-    fun queueRemove(itemIds: List<Int>) {
+    override fun queueRemove(itemIds: List<Int>) {
         if (itemIds.isEmpty()) return
         val running = app ?: return
         val session = mediaStatus?.mediaSessionId ?: return
@@ -130,17 +124,17 @@ internal class CastSession(
     }
 
     /** Skips to the next queued track, which the receiver has already preloaded. */
-    fun queueSkip() {
+    override fun queueSkip() {
         val running = app ?: return
         val session = mediaStatus?.mediaSessionId ?: return
         send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.queueJump(nextId(), session, 1))
     }
 
-    fun play() = mediaCommand("PLAY")
-    fun pause() = mediaCommand("PAUSE")
-    fun stopMedia() = mediaCommand("STOP")
+    override fun play() = mediaCommand("PLAY")
+    override fun pause() = mediaCommand("PAUSE")
+    override fun stopMedia() = mediaCommand("STOP")
 
-    fun seek(positionMs: Long) {
+    override fun seek(positionMs: Long) {
         val running = app ?: return
         val session = mediaStatus?.mediaSessionId ?: return
         send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.seek(nextId(), session, positionMs))
@@ -149,30 +143,30 @@ internal class CastSession(
         mediaStatusAt = SystemClock.elapsedRealtime()
     }
 
-    fun setPlaybackRate(rate: Double) {
+    override fun setPlaybackRate(rate: Double) {
         val running = app ?: return
         val session = mediaStatus?.mediaSessionId ?: return
         send(CastProtocol.NS_MEDIA, running.transportId, CastProtocol.setPlaybackRate(nextId(), session, rate))
     }
 
-    fun setVolume(level: Double) {
+    override fun setVolume(level: Double) {
         volumeLevel = level.coerceIn(0.0, 1.0)
         send(CastProtocol.NS_RECEIVER, CastProtocol.PLATFORM_ID, CastProtocol.setVolume(nextId(), level = volumeLevel))
     }
 
-    fun setMuted(muted: Boolean) {
+    override fun setMuted(muted: Boolean) {
         this.muted = muted
         send(CastProtocol.NS_RECEIVER, CastProtocol.PLATFORM_ID, CastProtocol.setVolume(nextId(), muted = muted))
     }
 
     /** A message on the receiver app's own channel — BitChord's lyrics, for one. */
-    fun sendCustom(namespace: String, payload: String) {
+    override fun sendCustom(namespace: String, payload: String) {
         val running = app ?: return
         send(namespace, running.transportId, payload)
     }
 
     /** Where the receiver is now: its last report, run forward while it plays. */
-    fun currentPositionMs(): Long {
+    override fun currentPositionMs(): Long {
         val status = mediaStatus ?: return 0L
         if (status.playerState != CastProtocol.PlayerState.PLAYING) return status.positionMs
         val elapsed = SystemClock.elapsedRealtime() - mediaStatusAt

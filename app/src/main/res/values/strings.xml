@@ -1162,5 +1162,9 @@
     <string name="cast_setting_subtitle">Show Chromecast and Google Cast devices in the output picker</string>
     <string name="cast_continue_title">Keep playing after casting</string>
     <string name="cast_continue_subtitle">When a cast session ends, carry on playing from this phone</string>
+    <string name="cast_captions_title">Lyrics on the TV (experimental)</string>
+    <string name="cast_captions_subtitle">Show synced lyrics as subtitles on Google\'s receiver</string>
+    <string name="cast_dlna_title">DLNA devices (experimental)</string>
+    <string name="cast_dlna_subtitle">Also list DLNA / UPnP TVs and speakers. Some can\'t play every track</string>
 
 </resources>

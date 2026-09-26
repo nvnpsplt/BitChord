@@ -21,6 +21,7 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.music.bitchord.R
 import com.music.bitchord.data.TrackLog
+import com.music.bitchord.data.settings.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -40,7 +41,7 @@ import kotlin.math.roundToInt
  * lock-screen lyric line are all written against it and its callbacks — and is
  * held silent in `STATE_IDLE`, where it resolves nothing, holds no audio focus
  * and renders nothing. The receiver is handed one track at a time over a
- * [CastSession], and everything that edits the queue edits the local player
+ * [RemoteSession], and everything that edits the queue edits the local player
  * exactly as it always has; this reconciles the receiver to it afterwards.
  *
  * ## Who owns what
@@ -89,7 +90,7 @@ internal class CastBridgePlayer(
     /** Whether this is bridging to a receiver right now. */
     val active: Boolean get() = session != null
 
-    private var session: CastSession? = null
+    private var session: RemoteSession? = null
     private val mainHandler = Handler(Looper.getMainLooper())
     private var scope = newScope()
     private var syncJob: Job? = null
@@ -184,7 +185,7 @@ internal class CastBridgePlayer(
      * points the session state at the receiver and hands the receiver the
      * current track, from where the local player had got to.
      */
-    fun activate(local: Player, session: CastSession) {
+    fun activate(local: Player, session: RemoteSession) {
         if (active) return
         if (local !== player) setPlayer(local)
         scope = newScope()
@@ -315,7 +316,9 @@ internal class CastBridgePlayer(
                     mirrorRemoteTransport(status.playerState)
                     // Playing the current track: make sure the next one waits behind it.
                     val desired = desiredNextUrl()
-                    if (queuedNextUrl != desired && desired != unqueueableUrl) requestSync()
+                    if (session?.supportsQueue == true && queuedNextUrl != desired && desired != unqueueableUrl) {
+                        requestSync()
+                    }
                 }
             }
         }
@@ -537,7 +540,8 @@ internal class CastBridgePlayer(
             seekedSinceSync = false
             invalidateState()
             val queueNext = if (local.repeatMode == Player.REPEAT_MODE_ONE) null else next
-            reconcileQueue(cast, queueNext, address)
+            // A renderer with no next-track slot (some DLNA ones) loads each track when its turn comes.
+            if (cast.supportsQueue) reconcileQueue(cast, queueNext, address)
             return
         }
 
@@ -608,6 +612,7 @@ internal class CastBridgePlayer(
                 artworkUrl = server.artworkUrl(address, metadata.artworkUri)?.toString(),
                 startPositionMs = startPosition,
                 autoplay = local.playWhenReady,
+                captionsUrl = captionsUrl(address, current),
             ),
         )
         host.onRemoteTrackLoaded(current.mediaId)
@@ -625,7 +630,7 @@ internal class CastBridgePlayer(
      * Keeps exactly the local queue's next track queued behind the current one
      * on the receiver, so the receiver preloads it and plays straight on.
      */
-    private suspend fun reconcileQueue(cast: CastSession, next: MediaItem?, address: String) {
+    private suspend fun reconcileQueue(cast: RemoteSession, next: MediaItem?, address: String) {
         val nextSource = next?.localConfiguration?.uri
         val nextUrl = nextSource?.let { server.audioUrl(address, it) }
         if (nextUrl == queuedNextUrl) return
@@ -654,6 +659,7 @@ internal class CastBridgePlayer(
                 artworkUrl = server.artworkUrl(address, metadata.artworkUri)?.toString(),
                 startPositionMs = 0,
                 autoplay = true,
+                captionsUrl = captionsUrl(address, next),
             ),
         )
         queuedNextUrl = nextUrl
@@ -746,6 +752,16 @@ internal class CastBridgePlayer(
         val source = item?.localConfiguration?.uri ?: return null
         val address = host.hostAddress() ?: return null
         return server.audioUrl(address, source)
+    }
+
+    /**
+     * The lyrics-as-subtitles file for [item], when that experiment is on. Only
+     * on Google's stock receiver: BitChord's own receiver shows lyrics itself.
+     */
+    private fun captionsUrl(address: String, item: MediaItem): String? {
+        if (CastSupport.hasCustomReceiver || !AppSettings.castLyricsCaptions.value) return null
+        if (session?.supportsCustomMessages != true) return null
+        return server.captionsUrl(address, item)
     }
 
     private fun remoteIsLive(): Boolean {

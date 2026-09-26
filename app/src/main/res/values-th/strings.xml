@@ -1312,5 +1312,9 @@
     <string name="cast_setting_subtitle">แสดงอุปกรณ์ Chromecast และ Google Cast ในตัวเลือกเอาต์พุต</string>
     <string name="cast_continue_title">เล่นต่อหลังแคสต์</string>
     <string name="cast_continue_subtitle">เมื่อเซสชันแคสต์สิ้นสุด ให้เล่นต่อจากโทรศัพท์เครื่องนี้</string>
+    <string name="cast_captions_title">เนื้อเพลงบนทีวี (ทดลอง)</string>
+    <string name="cast_captions_subtitle">แสดงเนื้อเพลงแบบซิงค์เป็นคำบรรยายบนตัวรับของ Google</string>
+    <string name="cast_dlna_title">อุปกรณ์ DLNA (ทดลอง)</string>
+    <string name="cast_dlna_subtitle">แสดงทีวีและลำโพง DLNA / UPnP ด้วย บางเครื่องอาจเล่นไม่ได้ทุกเพลง</string>
 
 </resources>
