@@ -1325,6 +1325,7 @@
     <string name="cast_blocked_party">A transmissão não está disponível durante o Listen Together</string>
     <string name="cast_track_skipped">Uma música que o dispositivo não conseguiu tocar foi pulada</string>
     <string name="cast_connect_failed">Não foi possível iniciar a transmissão. Verifique se o celular e o dispositivo estão no mesmo Wi-Fi.</string>
+    <string name="cast_connect_failed_reason">Não foi possível transmitir: %1$s</string>
     <string name="cast_feature_unavailable">Indisponível durante a transmissão</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">Mostrar dispositivos Chromecast e Google Cast na escolha de saída</string>

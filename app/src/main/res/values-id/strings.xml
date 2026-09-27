@@ -1300,6 +1300,7 @@
     <string name="cast_blocked_party">Transmisi tidak tersedia selama Listen Together</string>
     <string name="cast_track_skipped">Melewati lagu yang tidak bisa diputar perangkat</string>
     <string name="cast_connect_failed">Tidak dapat memulai transmisi. Pastikan ponsel dan perangkat terhubung ke Wi-Fi yang sama.</string>
+    <string name="cast_connect_failed_reason">Gagal mentransmisi: %1$s</string>
     <string name="cast_feature_unavailable">Tidak tersedia saat mentransmisikan</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">Tampilkan perangkat Chromecast dan Google Cast di pemilih output</string>

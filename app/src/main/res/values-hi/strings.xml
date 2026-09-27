@@ -1320,6 +1320,7 @@
     <string name="cast_blocked_party">Listen Together के दौरान कास्ट उपलब्ध नहीं है</string>
     <string name="cast_track_skipped">एक गाना छोड़ा गया जिसे कास्ट डिवाइस नहीं चला सका</string>
     <string name="cast_connect_failed">कास्ट शुरू नहीं हो सका। पक्का करें कि फ़ोन और कास्ट डिवाइस एक ही Wi-Fi पर हों।</string>
+    <string name="cast_connect_failed_reason">कास्ट नहीं हो सका: %1$s</string>
     <string name="cast_feature_unavailable">कास्ट करते समय उपलब्ध नहीं</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">आउटपुट चुनने में Chromecast और Google Cast डिवाइस दिखाएं</string>

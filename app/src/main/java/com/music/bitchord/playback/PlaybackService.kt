@@ -1598,7 +1598,14 @@ class PlaybackService : MediaLibraryService() {
         scope.launch {
             com.music.bitchord.playback.cast.CastStatus.pendingNotice.collect { message ->
                 if (message != null) {
-                    android.widget.Toast.makeText(this@PlaybackService, message, android.widget.Toast.LENGTH_SHORT).show()
+                    // The reason, where there is one, goes under the message:
+                    // it is what tells "wrong Wi-Fi" from "the TV said no".
+                    // Toasts show two lines at most, so a reason replaces the
+                    // general advice rather than trailing after it.
+                    val text = message.detail?.let { getString(R.string.cast_connect_failed_reason, it) }
+                        ?: getString(message.messageRes)
+                    val length = if (message.detail != null) android.widget.Toast.LENGTH_LONG else android.widget.Toast.LENGTH_SHORT
+                    android.widget.Toast.makeText(this@PlaybackService, text, length).show()
                     com.music.bitchord.playback.cast.CastStatus.consumeNotice()
                 }
             }

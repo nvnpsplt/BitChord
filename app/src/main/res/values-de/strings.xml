@@ -1320,6 +1320,7 @@
     <string name="cast_blocked_party">Streamen ist während Listen Together nicht verfügbar</string>
     <string name="cast_track_skipped">Titel übersprungen, den das Gerät nicht abspielen konnte</string>
     <string name="cast_connect_failed">Streamen konnte nicht gestartet werden. Handy und Gerät müssen im selben WLAN sein.</string>
+    <string name="cast_connect_failed_reason">Streamen fehlgeschlagen: %1$s</string>
     <string name="cast_feature_unavailable">Beim Streamen nicht verfügbar</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">Chromecast- und Google-Cast-Geräte in der Ausgabeauswahl anzeigen</string>

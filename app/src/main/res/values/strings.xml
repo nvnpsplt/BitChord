@@ -1157,6 +1157,7 @@
     <string name="cast_blocked_party">Casting isn\'t available during Listen Together</string>
     <string name="cast_track_skipped">Skipped a track the cast device couldn\'t play</string>
     <string name="cast_connect_failed">Couldn\'t start casting. Make sure this phone and the cast device are on the same Wi-Fi.</string>
+    <string name="cast_connect_failed_reason">Couldn\'t cast: %1$s</string>
     <string name="cast_feature_unavailable">Not available while casting</string>
     <string name="cast_setting_title">Google Cast</string>
     <string name="cast_setting_subtitle">Show Chromecast and Google Cast devices in the output picker</string>

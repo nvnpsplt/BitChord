@@ -5,8 +5,6 @@ import android.os.Looper
 import android.os.SystemClock
 import com.music.bitchord.data.TrackLog
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
@@ -83,7 +81,13 @@ internal class DlnaSession(
     override fun open() {
         submit {
             try {
-                call(Dlna.AV_TRANSPORT, renderer.avTransportUrl, "GetTransportInfo", instance())
+                try {
+                    call(Dlna.AV_TRANSPORT, renderer.avTransportUrl, "GetTransportInfo", instance())
+                } catch (fault: SoapFault) {
+                    // It is there and answering; some renderers refuse status
+                    // queries while they have nothing loaded.
+                    TrackLog.d(TAG, "DLNA renderer answered GetTransportInfo with ${fault.message}")
+                }
                 val volume = readVolume()
                 main.post {
                     if (closed) return@post
@@ -93,8 +97,8 @@ internal class DlnaSession(
                 }
                 worker.scheduleWithFixedDelay({ poll() }, POLL_MS, POLL_MS, TimeUnit.MILLISECONDS)
             } catch (e: Exception) {
-                TrackLog.d(TAG, "DLNA renderer unreachable: ${e.message}")
-                main.post { shutDown(e.message ?: "unreachable") }
+                TrackLog.d(TAG, "DLNA renderer unreachable at ${renderer.avTransportUrl}: ${e.javaClass.simpleName}: ${e.message}")
+                main.post { shutDown("DLNA ${e.javaClass.simpleName}${e.message?.let { ": $it" }.orEmpty()}") }
             }
         }
     }
@@ -442,28 +446,23 @@ internal class DlnaSession(
 
     private fun call(serviceType: String, url: String, action: String, args: List<Pair<String, String>>): Map<String, String> {
         val body = Dlna.soap(serviceType, action, args).toByteArray(Charsets.UTF_8)
-        val connection = URL(url).openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.connectTimeout = TIMEOUT_MS
-            connection.readTimeout = TIMEOUT_MS
-            connection.doOutput = true
-            connection.useCaches = false
-            connection.setRequestProperty("Content-Type", "text/xml; charset=\"utf-8\"")
-            connection.setRequestProperty("SOAPACTION", Dlna.soapAction(serviceType, action))
-            connection.setFixedLengthStreamingMode(body.size)
-            connection.outputStream.use { it.write(body) }
-            val code = connection.responseCode
-            if (code in 200..299) {
-                val reply = connection.inputStream.use { it.readBytes() }
-                return Dlna.parseResponse(reply) ?: emptyMap()
-            }
-            val fault = connection.errorStream?.use { it.readBytes() }?.let(Dlna::parseFault)
-            throw IOException("$action: ${fault ?: "HTTP $code"}")
-        } finally {
-            connection.disconnect()
-        }
+        val response = LanHttp.post(
+            url,
+            mapOf(
+                "Content-Type" to "text/xml; charset=\"utf-8\"",
+                // The spelling most control points send; some renderers match it exactly.
+                "SOAPAction" to Dlna.soapAction(serviceType, action),
+            ),
+            body,
+            TIMEOUT_MS,
+        )
+        if (response.code in 200..299) return Dlna.parseResponse(response.body) ?: emptyMap()
+        val fault = Dlna.parseFault(response.body)
+        throw SoapFault("$action: ${fault ?: "HTTP ${response.code}"}")
     }
+
+    /** The renderer answered, and said no — as opposed to not answering at all. */
+    private class SoapFault(message: String) : IOException(message)
 
     /** Runs [task] on the worker; a no-op once the session has shut down. */
     private fun submit(task: () -> Unit) {
@@ -482,7 +481,8 @@ internal class DlnaSession(
         const val POLL_MS = 1_000L
         const val TIMEOUT_MS = 5_000
         const val VOLUME_EVERY_POLLS = 5
-        const val MAX_POLL_FAILURES = 10
+        /** Missed polls before the renderer counts as gone; each can wait out TIMEOUT_MS. */
+        const val MAX_POLL_FAILURES = 4
 
         /** How long a renderer may take to start a track before STOPPED means it could not. */
         const val LOAD_GRACE_MS = 10_000L
